@@ -9,11 +9,21 @@ A premium beauty e-commerce experience built with Next.js, TypeScript, Tailwind 
 - Admin-ready backend structure with Prisma schema
 - Cloudflare R2 upload support via the backend
 
-## Local development
-1. Install dependencies for the frontend and backend
-2. Create the backend environment file from the example
-3. Run the Prisma migrations and seed
-4. Start the frontend and backend services
+## Local development (no Docker required)
+1. Install frontend dependencies from the project root:
+   - `npm install`
+2. Install backend dependencies:
+   - `cd backend && npm install`
+3. Create `backend/.env` from `backend/.env.example` and set your local DB and secrets.
+4. Run Prisma migrations or seed if needed:
+   - `cd backend && npm run migrate:deploy`
+   - `cd backend && npm run seed`
+5. Start the backend:
+   - `cd backend && npm run dev` for development
+   - or `cd backend && npm run start` after `npm run build`
+6. Start the frontend:
+   - `npm run dev` for local development
+   - or `npm run build && npm run start` for a production build
 
 ## Deployment on Railway
 - Deploy the frontend as a Next.js service
