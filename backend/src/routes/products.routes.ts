@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, requireAdmin, getUserRoleFromHeader } from '../middleware/auth.js';
+import { createSlug } from '../utils/slug.js';
 
 export const productsRoutes = Router();
 
@@ -148,6 +149,7 @@ productsRoutes.post('/', authMiddleware, requireAdmin, async (req, res) => {
   const product = await prisma.product.create({
     data: {
       name,
+      slug: createSlug(name),
       description,
       shortDescription,
       brandId: brandId || null,
@@ -208,7 +210,10 @@ productsRoutes.patch('/:id', authMiddleware, requireAdmin, async (req, res) => {
   } = req.body;
 
   const updates: any = {};
-  if (name !== undefined) updates.name = name;
+  if (name !== undefined) {
+    updates.name = name;
+    updates.slug = createSlug(name);
+  }
   if (description !== undefined) updates.description = description;
   if (shortDescription !== undefined) updates.shortDescription = shortDescription;
   if (brandId !== undefined) updates.brandId = brandId || null;

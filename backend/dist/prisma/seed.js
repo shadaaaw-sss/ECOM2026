@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { createSlug } from '../src/utils/slug.js';
 const prisma = new PrismaClient();
 async function main() {
     await prisma.setting.upsert({
@@ -41,8 +42,8 @@ async function main() {
     for (const item of categories) {
         await prisma.category.upsert({
             where: { name: item.name },
-            update: { description: item.description },
-            create: { name: item.name, description: item.description, sortOrder: 0 },
+            update: { description: item.description, slug: createSlug(item.name) },
+            create: { name: item.name, slug: createSlug(item.name), description: item.description, sortOrder: 0 },
         });
     }
     const brands = [
@@ -54,8 +55,8 @@ async function main() {
     for (const item of brands) {
         await prisma.brand.upsert({
             where: { name: item.name },
-            update: { description: item.description },
-            create: { name: item.name, description: item.description, isFeatured: true },
+            update: { description: item.description, slug: createSlug(item.name) },
+            create: { name: item.name, slug: createSlug(item.name), description: item.description, isFeatured: true },
         });
     }
     const skincare = await prisma.category.findUnique({ where: { name: 'Skincare' } });
@@ -69,6 +70,7 @@ async function main() {
             await prisma.product.update({
                 where: { id: existingProduct.id },
                 data: {
+                    slug: createSlug('Advanced Génifique Serum'),
                     description: 'A concentrated facial serum for radiant and smoother-looking skin.',
                     brandId: brand.id,
                     categoryId: skincare.id,
@@ -83,6 +85,7 @@ async function main() {
             await prisma.product.create({
                 data: {
                     name: 'Advanced Génifique Serum',
+                    slug: createSlug('Advanced Génifique Serum'),
                     description: 'A concentrated facial serum for radiant and smoother-looking skin.',
                     shortDescription: 'Best seller serum',
                     brandId: brand.id,

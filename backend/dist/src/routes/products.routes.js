@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, requireAdmin, getUserRoleFromHeader } from '../middleware/auth.js';
+import { createSlug } from '../utils/slug.js';
 export const productsRoutes = Router();
 const parseSort = (sort) => {
     const [field, direction] = sort.split('_');
@@ -96,6 +97,7 @@ productsRoutes.post('/', authMiddleware, requireAdmin, async (req, res) => {
     const product = await prisma.product.create({
         data: {
             name,
+            slug: createSlug(name),
             description,
             shortDescription,
             brandId: brandId || null,
@@ -132,8 +134,10 @@ productsRoutes.post('/', authMiddleware, requireAdmin, async (req, res) => {
 productsRoutes.patch('/:id', authMiddleware, requireAdmin, async (req, res) => {
     const { name, description, shortDescription, brandId, categoryId, subCategoryId, price, originalPrice, discountPercent, stock, weight, dimensions, tags, thumbnailUrl, isFeatured, isNew, isActive, metaTitle, metaDescription, images, } = req.body;
     const updates = {};
-    if (name !== undefined)
+    if (name !== undefined) {
         updates.name = name;
+        updates.slug = createSlug(name);
+    }
     if (description !== undefined)
         updates.description = description;
     if (shortDescription !== undefined)

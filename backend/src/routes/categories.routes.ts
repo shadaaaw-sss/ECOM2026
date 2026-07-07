@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../index.js';
 import { authMiddleware, requireAdmin, AuthRequest, getUserRoleFromHeader } from '../middleware/auth.js';
+import { createSlug } from '../utils/slug.js';
 
 export const categoriesRoutes = Router();
 
@@ -28,6 +29,7 @@ categoriesRoutes.post('/', authMiddleware, requireAdmin, async (req, res) => {
   const category = await prisma.category.create({
     data: {
       name,
+      slug: createSlug(name),
       description,
       imageUrl,
       parentId: parentId || null,
@@ -43,7 +45,10 @@ categoriesRoutes.patch('/:id', authMiddleware, requireAdmin, async (req, res) =>
   const { name, description, imageUrl, parentId, sortOrder, isActive } = req.body;
   const updates: any = {};
 
-  if (name !== undefined) updates.name = name;
+  if (name !== undefined) {
+    updates.name = name;
+    updates.slug = createSlug(name);
+  }
   if (description !== undefined) updates.description = description;
   if (imageUrl !== undefined) updates.imageUrl = imageUrl;
   if (parentId !== undefined) updates.parentId = parentId || null;

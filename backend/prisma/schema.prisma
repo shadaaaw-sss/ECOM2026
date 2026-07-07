@@ -255,6 +255,16 @@ model Setting {
   updatedAt DateTime @updatedAt
 }
 
+model ShippingMethod {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  price       Float
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+}
+
 model AuditLog {
   id        String   @id @default(cuid())
   userId    String?

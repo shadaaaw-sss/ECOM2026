@@ -32,6 +32,7 @@ app.use(cors(corsOrigins.length
 app.use(express.json({ limit: '2mb' }));
 app.use(rateLimiter);
 app.get('/health', (_req, res) => res.status(200).json({ status: 'ok' }));
+app.get('/api/health', (_req, res) => res.status(200).json({ status: 'ok' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productsRoutes);
 app.use('/api/categories', categoriesRoutes);
