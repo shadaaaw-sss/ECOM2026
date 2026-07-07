@@ -1,6 +1,20 @@
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  (typeof window !== 'undefined' ? `${window.location.origin}/api` : 'http://localhost:4000/api');
+const API_BASE_URL = (() => {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+
+  if (typeof window !== 'undefined') {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return 'http://localhost:4000/api';
+    }
+
+    throw new Error(
+      'Missing NEXT_PUBLIC_API_URL. Set NEXT_PUBLIC_API_URL to your backend URL in production.'
+    );
+  }
+
+  return 'http://localhost:4000/api';
+})();
 
 const getAuthToken = () => {
   if (typeof window === 'undefined') return null;
