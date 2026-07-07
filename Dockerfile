@@ -1,17 +1,16 @@
-FROM node:20-alpine AS builder
+FROM node:20-bookworm-slim AS builder
 WORKDIR /app
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 COPY package*.json ./
 RUN npm install
 COPY . .
 RUN npm run build
 
-FROM node:20-alpine AS runner
+FROM node:20-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-COPY package*.json ./
-RUN npm install --omit=dev
-COPY --from=builder /app/.next ./.next
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/next.config.js ./next.config.js
-COPY --from=builder /app/package.json ./package.json
-CMD ["sh", "-c", "npm run start"]
+EXPOSE 3000
+CMD ["node", "server.js"]
