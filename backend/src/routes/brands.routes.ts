@@ -1,65 +1,95 @@
 import { Router } from 'express';
-import { prisma } from '../index.js';
+import { pool, db } from '../db.js';
 import { authMiddleware, requireAdmin, AuthRequest, getUserRoleFromHeader } from '../middleware/auth.js';
-import { createSlug } from '../utils/slug.js';
+import { brand, product } from '../../drizzle/schema';
+import { eq } from 'drizzle-orm';
 
 export const brandsRoutes = Router();
 
 brandsRoutes.get('/', async (req, res) => {
   const all = req.query.all === 'true';
   const userRole = getUserRoleFromHeader(req);
-  const where = all && (userRole === 'ADMIN' || userRole === 'SUPERADMIN')
-    ? {}
-    : { isActive: true };
-  const brands = await prisma.brand.findMany({ where, orderBy: { sortOrder: 'asc' } });
-  res.json(brands);
+  const showAll = all && (userRole === 'ADMIN' || userRole === 'SUPERADMIN');
+  try {
+    if (db && (db as any).select) {
+      let q: any = (db as any).select().from(brand);
+      q = q.orderBy(brand.sortOrder.asc());
+      if (!showAll) q = q.where(eq(brand.isActive, true));
+      const rows = await q;
+      return res.json(rows);
+    }
+    const whereClause = showAll ? '' : 'WHERE is_active = true';
+    const { rows } = await pool.query(`SELECT * FROM brand ${whereClause} ORDER BY sort_order ASC`);
+    res.json(rows);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || 'Failed to fetch brands' });
+  }
 });
 
 brandsRoutes.get('/:id', async (req, res) => {
-  const brand = await prisma.brand.findUnique({ where: { id: String(req.params.id) } });
-  if (!brand) return res.status(404).json({ message: 'Brand not found' });
-  const products = await prisma.product.findMany({ where: { brandId: brand.id, isActive: true }, take: 12 });
-  res.json({ brand, products });
+  try {
+    if (db && (db as any).select) {
+      const brands = await (db as any).select().from(brand).where(eq(brand.id, String(req.params.id)));
+      const brandRow = brands[0];
+      if (!brandRow) return res.status(404).json({ message: 'Brand not found' });
+      const products = await (db as any)
+        .select()
+        .from(product)
+        .where(eq(product.brandId, brandRow.id))
+        .where(eq(product.isActive, true))
+        .limit(12);
+      return res.json({ brand: brandRow, products });
+    }
+    const { rows: brands } = await pool.query('SELECT * FROM brand WHERE id = $1', [String(req.params.id)]);
+    const brand = brands[0];
+    if (!brand) return res.status(404).json({ message: 'Brand not found' });
+    const { rows: products } = await pool.query('SELECT * FROM product WHERE brand_id = $1 AND is_active = true LIMIT 12', [brand.id]);
+    res.json({ brand, products });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || 'Failed to fetch brand' });
+  }
 });
 
 brandsRoutes.post('/', authMiddleware, requireAdmin, async (req, res) => {
   const { name, description, logoUrl, sortOrder, isFeatured, isActive } = req.body;
   if (!name) return res.status(400).json({ message: 'Name is required' });
-
-  const brand = await prisma.brand.create({
-    data: {
-      name,
-      slug: createSlug(name),
-      description,
-      logoUrl,
-      sortOrder: sortOrder !== undefined ? Number(sortOrder) : 0,
-      isFeatured: Boolean(isFeatured),
-      isActive: isActive !== undefined ? Boolean(isActive) : true,
-    },
-  });
-
-  res.status(201).json(brand);
+  try {
+    const id = require('uuid').v4();
+    const insert = `INSERT INTO brand(id, name, description, logo_url, sort_order, is_featured, is_active, created_at) VALUES($1,$2,$3,$4,$5,$6,$7,NOW()) RETURNING *`;
+    const { rows } = await pool.query(insert, [id, name, description || null, logoUrl || null, sortOrder !== undefined ? Number(sortOrder) : 0, Boolean(isFeatured), isActive !== undefined ? Boolean(isActive) : true]);
+    res.status(201).json(rows[0]);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || 'Failed to create brand' });
+  }
 });
 
 brandsRoutes.patch('/:id', authMiddleware, requireAdmin, async (req, res) => {
   const { name, description, logoUrl, sortOrder, isFeatured, isActive } = req.body;
-  const updates: any = {};
-
-  if (name !== undefined) {
-    updates.name = name;
-    updates.slug = createSlug(name);
+  try {
+    const fields: string[] = [];
+    const values: any[] = [];
+    let idx = 1;
+    if (name !== undefined) { fields.push(`name = $${idx++}`); values.push(name); }
+    if (description !== undefined) { fields.push(`description = $${idx++}`); values.push(description); }
+    if (logoUrl !== undefined) { fields.push(`logo_url = $${idx++}`); values.push(logoUrl); }
+    if (sortOrder !== undefined) { fields.push(`sort_order = $${idx++}`); values.push(Number(sortOrder)); }
+    if (isFeatured !== undefined) { fields.push(`is_featured = $${idx++}`); values.push(Boolean(isFeatured)); }
+    if (isActive !== undefined) { fields.push(`is_active = $${idx++}`); values.push(Boolean(isActive)); }
+    if (fields.length === 0) return res.status(400).json({ message: 'No fields to update' });
+    const sql = `UPDATE brand SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`;
+    values.push(String(req.params.id));
+    const { rows } = await pool.query(sql, values);
+    res.json(rows[0]);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || 'Failed to update brand' });
   }
-  if (description !== undefined) updates.description = description;
-  if (logoUrl !== undefined) updates.logoUrl = logoUrl;
-  if (sortOrder !== undefined) updates.sortOrder = Number(sortOrder);
-  if (isFeatured !== undefined) updates.isFeatured = Boolean(isFeatured);
-  if (isActive !== undefined) updates.isActive = Boolean(isActive);
-
-  const brand = await prisma.brand.update({ where: { id: String(req.params.id) }, data: updates });
-  res.json(brand);
 });
 
 brandsRoutes.delete('/:id', authMiddleware, requireAdmin, async (req, res) => {
-  await prisma.brand.delete({ where: { id: String(req.params.id) } });
-  res.json({ ok: true });
+  try {
+    await pool.query('DELETE FROM brand WHERE id = $1', [String(req.params.id)]);
+    res.json({ ok: true });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || 'Failed to delete brand' });
+  }
 });

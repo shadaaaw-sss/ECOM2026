@@ -4,7 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
-import { PrismaClient } from '@prisma/client';
+import { db as drizzleDb } from './db.js';
 import { authRoutes } from './routes/auth.routes.js';
 import { productsRoutes } from './routes/products.routes.js';
 import { categoriesRoutes } from './routes/categories.routes.js';
@@ -19,7 +19,7 @@ import { shippingRoutes } from './routes/shipping.routes.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { rateLimiter } from './middleware/rate-limiter.js';
 
-export const prisma = new PrismaClient();
+// Drizzle client is available as `db` from `./db.ts`.
 const app = express();
 
 app.use(helmet());

@@ -1,7 +1,6 @@
 import { Router } from 'express';
-import { prisma } from '../index.js';
+import { pool } from '../db.js';
 import { authMiddleware, requireAdmin, getUserRoleFromHeader } from '../middleware/auth.js';
-import { createSlug } from '../utils/slug.js';
 export const productsRoutes = Router();
 const parseSort = (sort) => {
     const [field, direction] = sort.split('_');
@@ -63,142 +62,112 @@ productsRoutes.get('/', async (req, res) => {
     const take = Math.max(1, Math.min(100, parseInt(String(limit), 10) || 12));
     const skip = (pageNumber - 1) * take;
     const orderBy = parseSort(String(sort));
-    const [total, products] = await Promise.all([
-        prisma.product.count({ where }),
-        prisma.product.findMany({
-            where,
-            include: { brand: true, category: true },
-            orderBy,
-            skip,
-            take,
-        }),
-    ]);
-    res.json({ data: products, total });
+    try {
+        const whereParts = [];
+        const values = [];
+        let idx = 1;
+        if (!allowAll) {
+            whereParts.push('is_active = true');
+        }
+        if (q) {
+            whereParts.push(`(name ILIKE $${idx} OR description ILIKE $${idx})`);
+            values.push(`%${String(q)}%`);
+            idx++;
+        }
+        if (brand) {
+            whereParts.push(`brand_id = $${idx}`);
+            values.push(String(brand));
+            idx++;
+        }
+        if (excludeId) {
+            whereParts.push(`id <> $${idx}`);
+            values.push(String(excludeId));
+            idx++;
+        }
+        const whereSql = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
+        const countRes = await pool.query(`SELECT COUNT(*)::int AS count FROM product ${whereSql}`, values);
+        const total = countRes.rows[0].count;
+        const orderField = Object.keys(orderBy)[0];
+        const orderDir = Object.values(orderBy)[0];
+        const sql = `SELECT p.*, b.* AS brand FROM product p LEFT JOIN brand b ON p.brand_id = b.id ${whereSql} ORDER BY p.${orderField} ${orderDir} LIMIT $${idx} OFFSET $${idx + 1}`;
+        values.push(take, skip);
+        const productsRes = await pool.query(sql, values);
+        res.json({ data: productsRes.rows, total });
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to fetch products' });
+    }
 });
 productsRoutes.get('/:id', async (req, res) => {
-    const product = await prisma.product.findUnique({
-        where: { id: String(req.params.id) },
-        include: { brand: true, category: true, images: true },
-    });
-    if (!product)
-        return res.status(404).json({ message: 'Product not found' });
-    res.json(product);
+    try {
+        const { rows } = await pool.query('SELECT p.*, b.* AS brand FROM product p LEFT JOIN brand b ON p.brand_id = b.id WHERE p.id = $1', [String(req.params.id)]);
+        const product = rows[0];
+        if (!product)
+            return res.status(404).json({ message: 'Product not found' });
+        res.json(product);
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to fetch product' });
+    }
 });
 productsRoutes.post('/', authMiddleware, requireAdmin, async (req, res) => {
     const { name, description, shortDescription, brandId, categoryId, subCategoryId, price, originalPrice, discountPercent, stock, weight, dimensions, tags, thumbnailUrl, isFeatured, isNew, isActive, metaTitle, metaDescription, images, } = req.body;
-    if (!name || price === undefined || stock === undefined) {
-        return res.status(400).json({ message: 'Name, price, and stock are required' });
+    if (!name || price === undefined) {
+        return res.status(400).json({ message: 'Name and price are required' });
     }
-    const parsedTags = Array.isArray(tags)
-        ? tags.filter((tag) => typeof tag === 'string').map((tag) => tag.trim()).filter(Boolean)
-        : typeof tags === 'string'
-            ? tags.split(',').map((tag) => tag.trim()).filter(Boolean)
-            : [];
-    const product = await prisma.product.create({
-        data: {
-            name,
-            slug: createSlug(name),
-            description,
-            shortDescription,
-            brandId: brandId || null,
-            categoryId: categoryId || null,
-            subCategoryId: subCategoryId || null,
-            price: Number(price),
-            originalPrice: originalPrice !== undefined ? Number(originalPrice) : undefined,
-            discountPercent: discountPercent !== undefined ? Number(discountPercent) : 0,
-            stock: Number(stock),
-            weight: weight !== undefined ? Number(weight) : undefined,
-            dimensions,
-            tags: parsedTags,
-            thumbnailUrl,
-            isFeatured: Boolean(isFeatured),
-            isNew: Boolean(isNew),
-            isActive: isActive !== undefined ? Boolean(isActive) : true,
-            metaTitle,
-            metaDescription,
-            images: Array.isArray(images)
-                ? {
-                    create: images
-                        .filter((image) => image && image.url)
-                        .map((image) => ({
-                        url: image.url,
-                        altText: image.altText || null,
-                        sortOrder: image.sortOrder ? Number(image.sortOrder) : 0,
-                    })),
-                }
-                : undefined,
-        },
-    });
-    res.status(201).json(product);
+    try {
+        const id = require('uuid').v4();
+        const insert = `INSERT INTO product(id,name,description,price,brand_id,is_active,created_at) VALUES($1,$2,$3,$4,$5,$6,NOW()) RETURNING *`;
+        const { rows } = await pool.query(insert, [id, name, description || null, Number(price), brandId || null, isActive !== undefined ? Boolean(isActive) : true]);
+        res.status(201).json(rows[0]);
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to create product' });
+    }
 });
 productsRoutes.patch('/:id', authMiddleware, requireAdmin, async (req, res) => {
     const { name, description, shortDescription, brandId, categoryId, subCategoryId, price, originalPrice, discountPercent, stock, weight, dimensions, tags, thumbnailUrl, isFeatured, isNew, isActive, metaTitle, metaDescription, images, } = req.body;
-    const updates = {};
-    if (name !== undefined) {
-        updates.name = name;
-        updates.slug = createSlug(name);
+    try {
+        const fields = [];
+        const values = [];
+        let idx = 1;
+        if (name !== undefined) {
+            fields.push(`name = $${idx++}`);
+            values.push(name);
+        }
+        if (description !== undefined) {
+            fields.push(`description = $${idx++}`);
+            values.push(description);
+        }
+        if (brandId !== undefined) {
+            fields.push(`brand_id = $${idx++}`);
+            values.push(brandId || null);
+        }
+        if (price !== undefined) {
+            fields.push(`price = $${idx++}`);
+            values.push(Number(price));
+        }
+        if (isActive !== undefined) {
+            fields.push(`is_active = $${idx++}`);
+            values.push(Boolean(isActive));
+        }
+        if (fields.length === 0)
+            return res.status(400).json({ message: 'No fields to update' });
+        const sql = `UPDATE product SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`;
+        values.push(String(req.params.id));
+        const { rows } = await pool.query(sql, values);
+        res.json(rows[0]);
     }
-    if (description !== undefined)
-        updates.description = description;
-    if (shortDescription !== undefined)
-        updates.shortDescription = shortDescription;
-    if (brandId !== undefined)
-        updates.brandId = brandId || null;
-    if (categoryId !== undefined)
-        updates.categoryId = categoryId || null;
-    if (subCategoryId !== undefined)
-        updates.subCategoryId = subCategoryId || null;
-    if (price !== undefined)
-        updates.price = Number(price);
-    if (originalPrice !== undefined)
-        updates.originalPrice = originalPrice !== null ? Number(originalPrice) : null;
-    if (discountPercent !== undefined)
-        updates.discountPercent = Number(discountPercent);
-    if (stock !== undefined)
-        updates.stock = Number(stock);
-    if (weight !== undefined)
-        updates.weight = weight !== null ? Number(weight) : null;
-    if (dimensions !== undefined)
-        updates.dimensions = dimensions;
-    if (tags !== undefined) {
-        updates.tags = Array.isArray(tags)
-            ? tags.filter((tag) => typeof tag === 'string').map((tag) => tag.trim()).filter(Boolean)
-            : typeof tags === 'string'
-                ? tags.split(',').map((tag) => tag.trim()).filter(Boolean)
-                : [];
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to update product' });
     }
-    if (thumbnailUrl !== undefined)
-        updates.thumbnailUrl = thumbnailUrl;
-    if (isFeatured !== undefined)
-        updates.isFeatured = Boolean(isFeatured);
-    if (isNew !== undefined)
-        updates.isNew = Boolean(isNew);
-    if (isActive !== undefined)
-        updates.isActive = Boolean(isActive);
-    if (metaTitle !== undefined)
-        updates.metaTitle = metaTitle;
-    if (metaDescription !== undefined)
-        updates.metaDescription = metaDescription;
-    if (Array.isArray(images)) {
-        updates.images = {
-            deleteMany: {},
-            create: images
-                .filter((image) => image && image.url)
-                .map((image) => ({
-                url: image.url,
-                altText: image.altText || null,
-                sortOrder: image.sortOrder ? Number(image.sortOrder) : 0,
-            })),
-        };
-    }
-    const product = await prisma.product.update({
-        where: { id: String(req.params.id) },
-        data: updates,
-        include: { brand: true, category: true, images: true },
-    });
-    res.json(product);
 });
 productsRoutes.delete('/:id', authMiddleware, requireAdmin, async (req, res) => {
-    await prisma.product.delete({ where: { id: String(req.params.id) } });
-    res.json({ ok: true });
+    try {
+        await pool.query('DELETE FROM product WHERE id = $1', [String(req.params.id)]);
+        res.json({ ok: true });
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message || 'Failed to delete product' });
+    }
 });
