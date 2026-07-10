@@ -29,18 +29,22 @@ export default function ProductDetailPage() {
 
   useEffect(() => {
     const fetch = async () => {
-      const response = await api.get<Product>(`/products/${id}`);
+      const response = await api.get<any>(`/products/${id}`);
       if (!response) { router.push('/products'); return; }
       setProduct(response);
 
       if (user) {
-        const wishlistItems = await api.get<any[]>('/wishlist');
-        setInWishlist(wishlistItems.some(item => item.product?.id === response.id));
+        try {
+          const wishlistItems = await api.get<any[]>('/wishlist');
+          setInWishlist(wishlistItems.some(item => item.product?.id === response.id));
+        } catch {}
       }
 
-      if (response.categoryId) {
-        const categoryRelated = await api.get<{ data: Product[]; total: number }>(`/products?category=${response.categoryId}&excludeId=${response.id}&limit=4`);
-        setRelated(categoryRelated?.data || []);
+      if (response.category_id) {
+        try {
+          const categoryRelated = await api.get<{ data: Product[]; total: number }>(`/products?category=${response.category_id}&excludeId=${response.id}&limit=4`);
+          setRelated(categoryRelated?.data || []);
+        } catch {}
       }
       setLoading(false);
     };
@@ -89,11 +93,11 @@ export default function ProductDetailPage() {
     ? product.product_images.sort((a, b) => a.sort_order - b.sort_order).map(i => i.url)
     : product.thumbnail_url ? [product.thumbnail_url] : [];
 
-  const discountAmount = product.original_price
-    ? Math.round(((product.original_price - product.price) / product.original_price) * 100)
+  const discountAmount = (product as any).original_price
+    ? Math.round((((product as any).original_price - product.price) / (product as any).original_price) * 100)
     : product.discount_percent || 0;
 
-  const savings = product.original_price ? product.original_price - product.price : 0;
+  const savings = (product as any).original_price ? (product as any).original_price - product.price : 0;
 
   return (
     <div className="min-h-screen bg-cream py-6" dir={isRTL ? 'rtl' : 'ltr'}>
@@ -103,11 +107,11 @@ export default function ProductDetailPage() {
           <Link href="/" className="hover:text-foreground transition-colors">{t('categories_breadcrumb_home')}</Link>
           {isRTL ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
           <Link href="/products" className="hover:text-foreground transition-colors">{t('categories_breadcrumb_products')}</Link>
-          {product.categories && (
+          {(product as any).category && (
             <>
               {isRTL ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
-              <Link href={`/categories/${product.categories.id}`} className="hover:text-foreground transition-colors">
-                {product.categories.name}
+              <Link href={`/categories/${(product as any).category.id}`} className="hover:text-foreground transition-colors">
+                {(product as any).category.name}
               </Link>
             </>
           )}
@@ -149,28 +153,18 @@ export default function ProductDetailPage() {
 
           {/* Info */}
           <div>
-            {product.brands && (
-              <Link href={`/brands/${product.brands.id}`} className="text-xs font-sans font-medium text-burgundy-700 uppercase tracking-wider hover:underline">
-                {product.brands.name}
+            {(product as any).brand && (
+              <Link href={`/brands/${(product as any).brand.id}`} className="text-xs font-sans font-medium text-burgundy-700 uppercase tracking-wider hover:underline">
+                {(product as any).brand.name}
               </Link>
             )}
             <h1 className="font-serif text-2xl md:text-3xl font-bold text-foreground mt-2 mb-4 leading-snug">{product.name}</h1>
 
-            {/* Rating placeholder */}
-            <div className={`flex items-center gap-2 mb-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
-              <div className="flex gap-0.5">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} size={14} className={`${i < 4 ? 'text-gold-500 fill-gold-500' : 'text-beige-200'}`} />
-                ))}
-              </div>
-              <span className="text-sm text-muted-foreground font-sans">(24 {t('product_reviews')})</span>
-            </div>
-
             {/* Price */}
             <div className={`flex items-baseline gap-3 mb-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
               <span className="text-3xl font-bold font-sans text-foreground">{product.price.toFixed(2)} {currency}</span>
-              {product.original_price && (
-                <span className="text-lg font-sans text-muted-foreground line-through">{product.original_price.toFixed(2)}</span>
+              {(product as any).original_price && (
+                <span className="text-lg font-sans text-muted-foreground line-through">{(product as any).original_price.toFixed(2)}</span>
               )}
               {discountAmount > 0 && (
                 <span className="badge-discount">-{discountAmount}%</span>
@@ -290,8 +284,8 @@ export default function ProductDetailPage() {
             ) : (
               <div className="space-y-3">
                 {[
-                  { label: t('product_brand'), value: product.brands?.name },
-                  { label: t('product_category'), value: product.categories?.name },
+                  { label: t('product_brand'), value: (product as any).brand?.name },
+                  { label: t('product_category'), value: (product as any).category?.name },
                   { label: t('product_weight'), value: product.weight ? `${product.weight} g` : null },
                   { label: t('product_stock'), value: `${product.stock} ${t('product_units')}` },
                   { label: t('product_tags'), value: product.tags?.join(', ') },

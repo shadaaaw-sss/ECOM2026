@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
+import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../db.js';
 import { authMiddleware, requireAdmin, AuthRequest } from '../middleware/auth.js';
 
@@ -35,7 +36,7 @@ ordersRoutes.post('/', async (req, res) => {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      const orderId = require('uuid').v4();
+      const orderId = uuidv4();
       await client.query(
         `INSERT INTO "order"(id,user_id,order_number,first_name,last_name,email,phone,address_line1,address_line2,city,postal_code,country,notes,shipping_method,payment_method,subtotal,shipping_fee,tax_amount,discount_amount,total,coupon_code,created_at)
          VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,NOW())`,
@@ -65,7 +66,7 @@ ordersRoutes.post('/', async (req, res) => {
       );
 
       const itemInserts = (items || []).map((item: any) => {
-        const itemId = require('uuid').v4();
+        const itemId = uuidv4();
         const subtotal = Number(item.product.price) * Number(item.quantity);
         return client.query(
           `INSERT INTO order_item(id,order_id,product_id,product_name,product_thumbnail,brand_name,price,quantity,subtotal,created_at)

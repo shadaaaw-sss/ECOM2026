@@ -1,12 +1,22 @@
 import { Router } from 'express';
-import { pool } from '../db.js';
+import { pool, db } from '../db.js';
 import { authMiddleware, requireAdmin, getUserRoleFromHeader } from '../middleware/auth.js';
+import { brand, product } from '../../drizzle/schema.js';
+import { asc, eq } from 'drizzle-orm/expressions.js';
 export const brandsRoutes = Router();
 brandsRoutes.get('/', async (req, res) => {
     const all = req.query.all === 'true';
     const userRole = getUserRoleFromHeader(req);
     const showAll = all && (userRole === 'ADMIN' || userRole === 'SUPERADMIN');
     try {
+        if (db && db.select) {
+            let q = db.select().from(brand);
+            q = q.orderBy(asc(brand.sortOrder));
+            if (!showAll)
+                q = q.where(eq(brand.isActive, true));
+            const rows = await q;
+            return res.json(rows);
+        }
         const whereClause = showAll ? '' : 'WHERE is_active = true';
         const { rows } = await pool.query(`SELECT * FROM brand ${whereClause} ORDER BY sort_order ASC`);
         res.json(rows);
@@ -17,12 +27,25 @@ brandsRoutes.get('/', async (req, res) => {
 });
 brandsRoutes.get('/:id', async (req, res) => {
     try {
+        if (db && db.select) {
+            const brands = await db.select().from(brand).where(eq(brand.id, String(req.params.id)));
+            const brandRow = brands[0];
+            if (!brandRow)
+                return res.status(404).json({ message: 'Brand not found' });
+            const products = await db
+                .select()
+                .from(product)
+                .where(eq(product.brandId, brandRow.id))
+                .where(eq(product.isActive, true))
+                .limit(12);
+            return res.json({ brand: brandRow, products });
+        }
         const { rows: brands } = await pool.query('SELECT * FROM brand WHERE id = $1', [String(req.params.id)]);
-        const brand = brands[0];
-        if (!brand)
+        const brandRow = brands[0];
+        if (!brandRow)
             return res.status(404).json({ message: 'Brand not found' });
-        const { rows: products } = await pool.query('SELECT * FROM product WHERE brand_id = $1 AND is_active = true LIMIT 12', [brand.id]);
-        res.json({ brand, products });
+        const { rows: products } = await pool.query('SELECT * FROM product WHERE brand_id = $1 AND is_active = true LIMIT 12', [brandRow.id]);
+        res.json({ brand: brandRow, products });
     }
     catch (error) {
         res.status(500).json({ message: error.message || 'Failed to fetch brand' });

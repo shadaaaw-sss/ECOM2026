@@ -27,13 +27,13 @@ export default function HomePage() {
         const [catRes, brandRes, featRes, newRes] = await Promise.all([
           api.get<Category[]>('/categories'),
           api.get<Brand[]>('/brands'),
-          api.get<Product[]>('/products'),
-          api.get<Product[]>('/products'),
+          api.get<{ data: Product[]; total: number }>('/products?limit=8'),
+          api.get<{ data: Product[]; total: number }>('/products?limit=4&sort=createdAt_desc'),
         ]);
         setCategories(catRes || []);
-        setBrands(brandRes.filter((brand) => brand.isFeatured) || []);
-        setFeaturedProducts(featRes.slice(0, 8) || []);
-        setNewProducts(newRes.slice(0, 4) || []);
+        setBrands((brandRes || []).filter((brand) => brand.isFeatured) || []);
+        setFeaturedProducts(featRes?.data?.slice(0, 8) || []);
+        setNewProducts(newRes?.data?.slice(0, 4) || []);
         setHeroBanners([{ id: 'hero-1', title: 'Luxury Beauty, Trusted Brands', subtitle: 'Discover premium skincare, makeup, fragrances and beauty essentials', description: 'Curated essentials for a refined routine', imageUrl: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=1000&q=80', linkUrl: '/products', buttonText: 'Shop Now', type: 'HERO', isActive: true, sortOrder: 1, startsAt: null, endsAt: null, createdAt: '' } as Banner]);
       } catch (error) {
         console.error(error);

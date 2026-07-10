@@ -8,7 +8,7 @@ interface AuthUser {
   email: string;
   firstName?: string | null;
   lastName?: string | null;
-  role: 'CUSTOMER' | 'ADMIN' | 'SUPERADMIN';
+  role: 'USER' | 'ADMIN' | 'SUPERADMIN';
 }
 
 interface AuthContextType {

@@ -1,8 +1,7 @@
 import { Router } from 'express';
-import { pool, db } from '../db.js';
-import { authMiddleware, requireAdmin, AuthRequest, getUserRoleFromHeader } from '../middleware/auth.js';
-import { brand, product } from '../../drizzle/schema';
-import { eq } from 'drizzle-orm';
+import { v4 as uuidv4 } from 'uuid';
+import { pool } from '../db.js';
+import { authMiddleware, requireAdmin, getUserRoleFromHeader } from '../middleware/auth.js';
 
 export const brandsRoutes = Router();
 
@@ -11,13 +10,6 @@ brandsRoutes.get('/', async (req, res) => {
   const userRole = getUserRoleFromHeader(req);
   const showAll = all && (userRole === 'ADMIN' || userRole === 'SUPERADMIN');
   try {
-    if (db && (db as any).select) {
-      let q: any = (db as any).select().from(brand);
-      q = q.orderBy(brand.sortOrder.asc());
-      if (!showAll) q = q.where(eq(brand.isActive, true));
-      const rows = await q;
-      return res.json(rows);
-    }
     const whereClause = showAll ? '' : 'WHERE is_active = true';
     const { rows } = await pool.query(`SELECT * FROM brand ${whereClause} ORDER BY sort_order ASC`);
     res.json(rows);
@@ -28,23 +20,11 @@ brandsRoutes.get('/', async (req, res) => {
 
 brandsRoutes.get('/:id', async (req, res) => {
   try {
-    if (db && (db as any).select) {
-      const brands = await (db as any).select().from(brand).where(eq(brand.id, String(req.params.id)));
-      const brandRow = brands[0];
-      if (!brandRow) return res.status(404).json({ message: 'Brand not found' });
-      const products = await (db as any)
-        .select()
-        .from(product)
-        .where(eq(product.brandId, brandRow.id))
-        .where(eq(product.isActive, true))
-        .limit(12);
-      return res.json({ brand: brandRow, products });
-    }
     const { rows: brands } = await pool.query('SELECT * FROM brand WHERE id = $1', [String(req.params.id)]);
-    const brand = brands[0];
-    if (!brand) return res.status(404).json({ message: 'Brand not found' });
-    const { rows: products } = await pool.query('SELECT * FROM product WHERE brand_id = $1 AND is_active = true LIMIT 12', [brand.id]);
-    res.json({ brand, products });
+    const brandRow = brands[0];
+    if (!brandRow) return res.status(404).json({ message: 'Brand not found' });
+    const { rows: products } = await pool.query('SELECT * FROM product WHERE brand_id = $1 AND is_active = true LIMIT 12', [brandRow.id]);
+    res.json({ brand: brandRow, products });
   } catch (error: any) {
     res.status(500).json({ message: error.message || 'Failed to fetch brand' });
   }
@@ -54,7 +34,7 @@ brandsRoutes.post('/', authMiddleware, requireAdmin, async (req, res) => {
   const { name, description, logoUrl, sortOrder, isFeatured, isActive } = req.body;
   if (!name) return res.status(400).json({ message: 'Name is required' });
   try {
-    const id = require('uuid').v4();
+    const id = uuidv4();
     const insert = `INSERT INTO brand(id, name, description, logo_url, sort_order, is_featured, is_active, created_at) VALUES($1,$2,$3,$4,$5,$6,$7,NOW()) RETURNING *`;
     const { rows } = await pool.query(insert, [id, name, description || null, logoUrl || null, sortOrder !== undefined ? Number(sortOrder) : 0, Boolean(isFeatured), isActive !== undefined ? Boolean(isActive) : true]);
     res.status(201).json(rows[0]);

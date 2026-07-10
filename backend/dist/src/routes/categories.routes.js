@@ -1,12 +1,22 @@
 import { Router } from 'express';
-import { pool } from '../db.js';
+import { pool, db } from '../db.js';
 import { authMiddleware, requireAdmin, getUserRoleFromHeader } from '../middleware/auth.js';
+import { category, product } from '../../drizzle/schema.js';
+import { asc, eq } from 'drizzle-orm/expressions.js';
 export const categoriesRoutes = Router();
 categoriesRoutes.get('/', async (req, res) => {
     const all = req.query.all === 'true';
     const userRole = getUserRoleFromHeader(req);
     const showAll = all && (userRole === 'ADMIN' || userRole === 'SUPERADMIN');
     try {
+        if (db && db.select) {
+            let q = db.select().from(category);
+            q = q.orderBy(asc(category.sortOrder));
+            if (!showAll)
+                q = q.where(eq(category.isActive, true));
+            const rows = await q;
+            return res.json(rows);
+        }
         const whereClause = showAll ? '' : 'WHERE is_active = true';
         const { rows } = await pool.query(`SELECT * FROM category ${whereClause} ORDER BY sort_order ASC`);
         res.json(rows);
@@ -17,12 +27,25 @@ categoriesRoutes.get('/', async (req, res) => {
 });
 categoriesRoutes.get('/:id', async (req, res) => {
     try {
+        if (db && db.select) {
+            const cats = await db.select().from(category).where(eq(category.id, String(req.params.id)));
+            const categoryRow = cats[0];
+            if (!categoryRow)
+                return res.status(404).json({ message: 'Category not found' });
+            const products = await db
+                .select()
+                .from(product)
+                .where(eq(product.categoryId, categoryRow.id))
+                .where(eq(product.isActive, true))
+                .limit(12);
+            return res.json({ category: categoryRow, products });
+        }
         const { rows: cats } = await pool.query('SELECT * FROM category WHERE id = $1', [String(req.params.id)]);
-        const category = cats[0];
-        if (!category)
+        const categoryRow = cats[0];
+        if (!categoryRow)
             return res.status(404).json({ message: 'Category not found' });
-        const { rows: products } = await pool.query('SELECT * FROM product WHERE category_id = $1 AND is_active = true LIMIT 12', [category.id]);
-        res.json({ category, products });
+        const { rows: products } = await pool.query('SELECT * FROM product WHERE category_id = $1 AND is_active = true LIMIT 12', [categoryRow.id]);
+        res.json({ category: categoryRow, products });
     }
     catch (error) {
         res.status(500).json({ message: error.message || 'Failed to fetch category' });

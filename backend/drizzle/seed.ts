@@ -69,6 +69,13 @@ async function run() {
         description text,
         price numeric(10,2) DEFAULT 0,
         brand_id varchar(36),
+        category_id varchar(36),
+        thumbnail_url text,
+        stock integer DEFAULT 10,
+        original_price numeric(10,2) DEFAULT 0,
+        discount_percent integer DEFAULT 0,
+        is_featured boolean DEFAULT false,
+        is_new boolean DEFAULT false,
         is_active boolean DEFAULT true,
         created_at timestamptz DEFAULT NOW()
       );
@@ -140,6 +147,61 @@ async function run() {
     const hashed = await bcrypt.hash(adminPass, 10);
     const adminId = uuidv4();
     await client.query('INSERT INTO "user"(id,email,password,role) VALUES($1,$2,$3,$4)', [adminId, adminEmail, hashed, 'ADMIN']);
+
+    // Insert starter catalog data
+    const brand1 = uuidv4();
+    const brand2 = uuidv4();
+    const brand3 = uuidv4();
+    const category1 = uuidv4();
+    const category2 = uuidv4();
+    const category3 = uuidv4();
+
+    await client.query(
+      'INSERT INTO brand(id,name,description,logo_url,sort_order,is_featured,is_active) VALUES($1,$2,$3,$4,$5,$6,$7)',
+      [brand1, 'Lancôme', 'Luxury skincare and fragrance', null, 1, true, true]
+    );
+    await client.query(
+      'INSERT INTO brand(id,name,description,logo_url,sort_order,is_featured,is_active) VALUES($1,$2,$3,$4,$5,$6,$7)',
+      [brand2, 'Estée Lauder', 'Prestige beauty essentials', null, 2, true, true]
+    );
+    await client.query(
+      'INSERT INTO brand(id,name,description,logo_url,sort_order,is_featured,is_active) VALUES($1,$2,$3,$4,$5,$6,$7)',
+      [brand3, 'The Ordinary', 'Clinical skincare with simplicity', null, 3, true, true]
+    );
+
+    await client.query(
+      'INSERT INTO category(id,name,description,image_url,parent_id,sort_order,is_active) VALUES($1,$2,$3,$4,$5,$6,$7)',
+      [category1, 'Skincare', 'Daily essentials and skincare routines', null, null, 1, true]
+    );
+    await client.query(
+      'INSERT INTO category(id,name,description,image_url,parent_id,sort_order,is_active) VALUES($1,$2,$3,$4,$5,$6,$7)',
+      [category2, 'Makeup', 'Color, complexion and finishing beauty', null, null, 2, true]
+    );
+    await client.query(
+      'INSERT INTO category(id,name,description,image_url,parent_id,sort_order,is_active) VALUES($1,$2,$3,$4,$5,$6,$7)',
+      [category3, 'Fragrance', 'Signature scents and everyday luxury', null, null, 3, true]
+    );
+
+    const product1 = uuidv4();
+    const product2 = uuidv4();
+    const product3 = uuidv4();
+    const product4 = uuidv4();
+    await client.query(
+      'INSERT INTO product(id,name,description,price,brand_id,category_id,thumbnail_url,stock,original_price,discount_percent,is_featured,is_new,is_active) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',
+      [product1, 'Velvet Cream Cleanser', 'Gentle cleansing cream for dry and sensitive skin', 42.00, brand1, category1, 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=800&q=80', 12, 55.00, 20, true, true, true]
+    );
+    await client.query(
+      'INSERT INTO product(id,name,description,price,brand_id,category_id,thumbnail_url,stock,original_price,discount_percent,is_featured,is_new,is_active) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',
+      [product2, 'Radiance Serum', 'Vitamin-rich serum for a brighter glow', 68.00, brand2, category1, 'https://images.unsplash.com/photo-1571781926291-c477ebfd024b?auto=format&fit=crop&w=800&q=80', 8, 85.00, 20, true, false, true]
+    );
+    await client.query(
+      'INSERT INTO product(id,name,description,price,brand_id,category_id,thumbnail_url,stock,original_price,discount_percent,is_featured,is_new,is_active) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',
+      [product3, 'Silk Foundation', 'Lightweight liquid foundation with buildable coverage', 49.00, brand2, category2, 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=800&q=80', 15, 65.00, 25, true, false, true]
+    );
+    await client.query(
+      'INSERT INTO product(id,name,description,price,brand_id,category_id,thumbnail_url,stock,original_price,discount_percent,is_featured,is_new,is_active) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',
+      [product4, 'Golden Eau de Parfum', 'A luminous fragrance with woody and floral notes', 92.00, brand3, category3, 'https://images.unsplash.com/photo-1617038260897-41a1f14a8ca0?auto=format&fit=crop&w=800&q=80', 5, 120.00, 23, true, true, true]
+    );
 
     // Insert default shipping methods
     const ship1 = uuidv4();

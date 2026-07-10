@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../db.js';
 import { authMiddleware, requireAdmin } from '../middleware/auth.js';
 
@@ -24,7 +25,7 @@ shippingRoutes.post('/', authMiddleware, requireAdmin, async (req, res) => {
   }
   try {
     const insert = 'INSERT INTO shipping_method(id, name, description, price, is_active, created_at) VALUES($1,$2,$3,$4,$5,NOW()) RETURNING *';
-    const id = require('uuid').v4();
+    const id = uuidv4();
     const { rows } = await pool.query(insert, [id, name, description || null, Number(price), isActive !== undefined ? Boolean(isActive) : true]);
     res.status(201).json(rows[0]);
   } catch (error: any) {

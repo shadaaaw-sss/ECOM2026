@@ -70,8 +70,8 @@ export default function Navbar() {
     searchDebounce.current = setTimeout(async () => {
       setSearchLoading(true);
       try {
-        const data = await api.get<Product[]>('/products');
-        const filtered = data.filter((product) => product.name.toLowerCase().includes(searchQuery.toLowerCase()));
+        const data = await api.get<{ data: Product[]; total: number }>(`/products?q=${encodeURIComponent(searchQuery)}&limit=6`);
+        const filtered = (data?.data || []).filter((product) => product.name.toLowerCase().includes(searchQuery.toLowerCase()));
         setSearchResults(filtered.slice(0, 6));
       } catch (error) {
         console.error(error);

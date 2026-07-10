@@ -11,7 +11,7 @@ authRoutes.post('/register', async (req, res) => {
         return res.status(400).json({ message: 'Email and password are required' });
     try {
         const existingRes = await pool.query('SELECT id FROM "user" WHERE email = $1', [email]);
-        if (existingRes.rowCount > 0)
+        if ((existingRes.rowCount ?? 0) > 0)
             return res.status(409).json({ message: 'User already exists' });
         const passwordHash = await bcrypt.hash(password, 10);
         const id = require('uuid').v4();

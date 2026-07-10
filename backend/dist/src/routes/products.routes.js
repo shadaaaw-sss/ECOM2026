@@ -3,61 +3,26 @@ import { pool } from '../db.js';
 import { authMiddleware, requireAdmin, getUserRoleFromHeader } from '../middleware/auth.js';
 export const productsRoutes = Router();
 const parseSort = (sort) => {
-    const [field, direction] = sort.split('_');
-    const ascending = direction === 'asc';
-    const sortOrder = ascending ? 'asc' : 'desc';
+    const parts = sort.split('_');
+    const direction = parts.at(-1) === 'asc' ? 'asc' : 'desc';
+    const field = parts.slice(0, -1).join('_');
     switch (field) {
         case 'price':
-            return { price: sortOrder };
+            return { price: direction };
         case 'name':
-            return { name: sortOrder };
+            return { name: direction };
+        case 'created_at':
+        case 'createdAt':
+        case 'created':
+            return { created_at: direction };
         default:
-            return { createdAt: sortOrder };
+            return { created_at: direction };
     }
 };
 productsRoutes.get('/', async (req, res) => {
-    const { q, filter, category, brand, sort = 'createdAt_desc', min_price, max_price, page = '1', limit = '12', excludeId, all, } = req.query;
+    const { q, filter, category, brand, sort = 'created_at_desc', min_price, max_price, page = '1', limit = '12', excludeId, all, } = req.query;
     const userRole = getUserRoleFromHeader(req);
     const allowAll = String(all) === 'true' && (userRole === 'ADMIN' || userRole === 'SUPERADMIN');
-    const where = {};
-    if (!allowAll) {
-        where.isActive = true;
-    }
-    if (q) {
-        where.OR = [
-            { name: { contains: String(q), mode: 'insensitive' } },
-            { description: { contains: String(q), mode: 'insensitive' } },
-            { shortDescription: { contains: String(q), mode: 'insensitive' } },
-        ];
-    }
-    if (filter === 'featured') {
-        where.isFeatured = true;
-    }
-    if (filter === 'new') {
-        where.isNew = true;
-    }
-    if (filter === 'sale') {
-        where.discountPercent = { gt: 0 };
-    }
-    if (category) {
-        where.categoryId = String(category);
-    }
-    if (brand) {
-        where.brandId = String(brand);
-    }
-    if (min_price) {
-        const value = parseFloat(String(min_price));
-        if (!Number.isNaN(value))
-            where.price = { ...where.price, gte: value };
-    }
-    if (max_price) {
-        const value = parseFloat(String(max_price));
-        if (!Number.isNaN(value))
-            where.price = { ...where.price, lte: value };
-    }
-    if (excludeId) {
-        where.id = { not: String(excludeId) };
-    }
     const pageNumber = Math.max(1, parseInt(String(page), 10) || 1);
     const take = Math.max(1, Math.min(100, parseInt(String(limit), 10) || 12));
     const skip = (pageNumber - 1) * take;
@@ -67,29 +32,85 @@ productsRoutes.get('/', async (req, res) => {
         const values = [];
         let idx = 1;
         if (!allowAll) {
-            whereParts.push('is_active = true');
+            whereParts.push('p.is_active = true');
         }
         if (q) {
-            whereParts.push(`(name ILIKE $${idx} OR description ILIKE $${idx})`);
+            whereParts.push(`(p.name ILIKE $${idx} OR p.description ILIKE $${idx})`);
             values.push(`%${String(q)}%`);
             idx++;
         }
+        if (filter === 'featured') {
+            whereParts.push(`p.is_featured = true`);
+        }
+        if (filter === 'new') {
+            whereParts.push(`p.is_new = true`);
+        }
+        if (filter === 'sale') {
+            whereParts.push(`p.discount_percent > 0`);
+        }
+        if (category) {
+            whereParts.push(`p.category_id = $${idx}`);
+            values.push(String(category));
+            idx++;
+        }
         if (brand) {
-            whereParts.push(`brand_id = $${idx}`);
+            whereParts.push(`p.brand_id = $${idx}`);
             values.push(String(brand));
             idx++;
         }
+        if (min_price) {
+            const value = parseFloat(String(min_price));
+            if (!Number.isNaN(value)) {
+                whereParts.push(`p.price >= $${idx}`);
+                values.push(value);
+                idx++;
+            }
+        }
+        if (max_price) {
+            const value = parseFloat(String(max_price));
+            if (!Number.isNaN(value)) {
+                whereParts.push(`p.price <= $${idx}`);
+                values.push(value);
+                idx++;
+            }
+        }
         if (excludeId) {
-            whereParts.push(`id <> $${idx}`);
+            whereParts.push(`p.id <> $${idx}`);
             values.push(String(excludeId));
             idx++;
         }
         const whereSql = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
-        const countRes = await pool.query(`SELECT COUNT(*)::int AS count FROM product ${whereSql}`, values);
+        const countRes = await pool.query(`SELECT COUNT(*)::int AS count FROM product p ${whereParts.length ? 'WHERE ' + whereParts.join(' AND ') : ''}`, values);
         const total = countRes.rows[0].count;
         const orderField = Object.keys(orderBy)[0];
         const orderDir = Object.values(orderBy)[0];
-        const sql = `SELECT p.*, b.* AS brand FROM product p LEFT JOIN brand b ON p.brand_id = b.id ${whereSql} ORDER BY p.${orderField} ${orderDir} LIMIT $${idx} OFFSET $${idx + 1}`;
+        const fieldMap = { created_at: 'created_at', price: 'price', name: 'name' };
+        const orderFieldSql = fieldMap[orderField] || orderField;
+        const sql = `
+      SELECT
+        p.id,
+        p.name,
+        p.description,
+        CAST(p.price AS DOUBLE PRECISION) AS price,
+        p.brand_id,
+        p.category_id,
+        p.thumbnail_url,
+        p.stock,
+        CAST(p.original_price AS DOUBLE PRECISION) AS original_price,
+        p.discount_percent,
+        p.is_featured,
+        p.is_new,
+        p.is_active,
+        p.created_at,
+        json_build_object('id', b.id, 'name', b.name, 'logo_url', b.logo_url, 'is_featured', b.is_featured, 'is_active', b.is_active) AS brand,
+        json_build_object('id', c.id, 'name', c.name, 'image_url', c.image_url, 'is_active', c.is_active) AS category
+      FROM product p
+      LEFT JOIN brand b ON p.brand_id = b.id
+      LEFT JOIN category c ON p.category_id = c.id
+      ${whereSql}
+      ORDER BY p.${orderFieldSql} ${orderDir}
+      LIMIT $${idx} OFFSET $${idx + 1}
+    `;
         values.push(take, skip);
         const productsRes = await pool.query(sql, values);
         res.json({ data: productsRes.rows, total });
@@ -100,7 +121,29 @@ productsRoutes.get('/', async (req, res) => {
 });
 productsRoutes.get('/:id', async (req, res) => {
     try {
-        const { rows } = await pool.query('SELECT p.*, b.* AS brand FROM product p LEFT JOIN brand b ON p.brand_id = b.id WHERE p.id = $1', [String(req.params.id)]);
+        const { rows } = await pool.query(`
+      SELECT
+        p.id,
+        p.name,
+        p.description,
+        CAST(p.price AS DOUBLE PRECISION) AS price,
+        p.brand_id,
+        p.category_id,
+        p.thumbnail_url,
+        p.stock,
+        CAST(p.original_price AS DOUBLE PRECISION) AS original_price,
+        p.discount_percent,
+        p.is_featured,
+        p.is_new,
+        p.is_active,
+        p.created_at,
+        json_build_object('id', b.id, 'name', b.name, 'logo_url', b.logo_url, 'is_featured', b.is_featured, 'is_active', b.is_active) AS brand,
+        json_build_object('id', c.id, 'name', c.name, 'image_url', c.image_url, 'is_active', c.is_active) AS category
+      FROM product p
+      LEFT JOIN brand b ON p.brand_id = b.id
+      LEFT JOIN category c ON p.category_id = c.id
+      WHERE p.id = $1
+    `, [String(req.params.id)]);
         const product = rows[0];
         if (!product)
             return res.status(404).json({ message: 'Product not found' });
