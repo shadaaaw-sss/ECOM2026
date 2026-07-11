@@ -14,7 +14,7 @@ if (-not $pgInstalled) {
     exit 1
 }
 
-Write-Host "✓ PostgreSQL found: $($pgInstalled.Source)" -ForegroundColor Green
+Write-Host "PostgreSQL found: $($pgInstalled.Source)" -ForegroundColor Green
 Write-Host ""
 
 # Database configuration
@@ -37,9 +37,9 @@ $env:PGPASSWORD = $dbPasswordPlain
 $createDbResult = psql -U $dbUser -h $dbHost -p $dbPort -c "CREATE DATABASE $dbName;" 2>&1
 
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "✓ Database '$dbName' created successfully" -ForegroundColor Green
+    Write-Host "Database '$dbName' created successfully" -ForegroundColor Green
 } elseif ($createDbResult -match "already exists") {
-    Write-Host "✓ Database '$dbName' already exists" -ForegroundColor Yellow
+    Write-Host "Database '$dbName' already exists" -ForegroundColor Yellow
 } else {
     Write-Host "ERROR: Failed to create database" -ForegroundColor Red
     Write-Host $createDbResult
@@ -55,7 +55,7 @@ if (Test-Path $seedScript) {
     Write-Host "Running seed script..." -ForegroundColor Cyan
     Set-Location "..\backend"
     npx tsx drizzle/seed.ts
-    Write-Host "✓ Database seeded successfully" -ForegroundColor Green
+    Write-Host "Database seeded successfully" -ForegroundColor Green
 } else {
     Write-Host "WARNING: Seed script not found at $seedScript" -ForegroundColor Yellow
     Write-Host "You'll need to run the seed script manually" -ForegroundColor Yellow

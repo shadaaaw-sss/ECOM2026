@@ -67,7 +67,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
-  const subtotal = items.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
+  const subtotal = items.reduce((sum, i) => sum + (Number(i.product.price) || 0) * i.quantity, 0);
   const isInCart = (productId: string) => items.some(i => i.product.id === productId);
 
   return (

@@ -15,6 +15,7 @@ import { wishlistRoutes } from './routes/wishlist.routes.js';
 import { couponsRoutes } from './routes/coupons.routes.js';
 import { settingsRoutes } from './routes/settings.routes.js';
 import { shippingRoutes } from './routes/shipping.routes.js';
+import { facturesRoutes } from './routes/factures.routes.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { rateLimiter } from './middleware/rate-limiter.js';
 
@@ -50,6 +51,7 @@ app.use('/api/coupons', couponsRoutes);
 app.use('/api/uploads', uploadsRoutes);
 app.use('/api/newsletters', newslettersRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/factures', facturesRoutes);
 app.use(errorHandler);
 
 const port = Number(process.env.PORT || 4000);

@@ -1,81 +1,60 @@
-const API_BASE_URL = (() => {
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
+class ApiClient {
+  private baseUrl: string;
+
+  constructor(baseUrl: string) {
+    this.baseUrl = baseUrl;
   }
 
-  if (typeof window !== 'undefined') {
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      return 'http://localhost:4000/api';
+  private getHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (typeof window !== 'undefined') {
+      // Check both token keys for compatibility
+      const token = localStorage.getItem('makhmal_token') || localStorage.getItem('admin_token') || localStorage.getItem('token');
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
     }
-
-    throw new Error(
-      'Missing NEXT_PUBLIC_API_URL. Set NEXT_PUBLIC_API_URL to your backend URL in production.'
-    );
+    return headers;
   }
 
-  if (!process.env.NEXT_PUBLIC_API_URL) {
-  throw new Error("NEXT_PUBLIC_API_URL is missing");
-}
-
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
-})();
-
-const getAuthToken = () => {
-  if (typeof window === 'undefined') return null;
-  return window.localStorage.getItem('makhmal_token');
-};
-
-const isFormData = (body: unknown): body is FormData => typeof FormData !== 'undefined' && body instanceof FormData;
-
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getAuthToken();
-  const headers = new Headers(init?.headers as HeadersInit);
-
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
+  async get<T>(path: string): Promise<T> {
+    const res = await fetch(`${this.baseUrl}${path}`, { headers: this.getHeaders() });
+    if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`);
+    return res.json();
   }
 
-  // Only set JSON content-type when body exists and is not FormData
-  const body = init?.body as any;
-  if (body !== undefined && !isFormData(body)) {
-    headers.set('Content-Type', 'application/json');
-  }
-
-  // If body is a plain object (not string/Blob/FormData), stringify it for fetch
-  let finalBody: BodyInit | undefined = body;
-  if (body !== undefined && !isFormData(body) && typeof body !== 'string' && !(body instanceof Blob)) {
-    try {
-      finalBody = JSON.stringify(body);
-    } catch (e) {
-      console.warn('Failed to stringify request body', e);
-    }
-  }
-
-  try {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
-      headers,
-      ...init,
-      body: finalBody,
+  async post<T>(path: string, body?: any): Promise<T> {
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: body ? JSON.stringify(body) : undefined,
     });
+    if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`);
+    return res.json();
+  }
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Request failed' }));
-      throw new Error(error.message || 'Request failed');
-    }
+  async patch<T>(path: string, body?: any): Promise<T> {
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (!res.ok) throw new Error(`PATCH ${path} failed: ${res.status}`);
+    return res.json();
+  }
 
-    const text = await response.text();
-    return (text ? JSON.parse(text) : {}) as T;
-  } catch (err: any) {
-    if (err.message?.includes('Failed to fetch') || err.message?.includes('fetch failed')) {
-      throw new Error('Server connection failed. Please ensure the backend server is running.');
-    }
-    throw err;
+  async delete<T>(path: string): Promise<T> {
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    });
+    if (!res.ok) throw new Error(`DELETE ${path} failed: ${res.status}`);
+    return res.json();
   }
 }
 
-export const api = {
-  get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body: body as BodyInit }),
-  patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body: body as BodyInit }),
-  delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
-};
+export const api = new ApiClient(API_BASE);

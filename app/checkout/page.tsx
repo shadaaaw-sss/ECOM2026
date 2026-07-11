@@ -53,8 +53,8 @@ export default function CheckoutPage() {
   }, []);
 
   const selectedShipping = shippingMethods.find(m => m.name === shippingMethod);
-  const shippingFee = selectedShipping ? selectedShipping.price : 39;
-  const total = subtotal + shippingFee - discount;
+  const shippingFee = selectedShipping ? Number(selectedShipping.price) || 0 : 0;
+  const total = Number(subtotal) + shippingFee - Number(discount);
 
   const set = (field: string, value: string) => {
     setForm(f => ({ ...f, [field]: value }));
@@ -242,7 +242,7 @@ export default function CheckoutPage() {
                         <p className="text-xs font-sans font-medium text-foreground line-clamp-2">{product.name}</p>
                         <p className="text-xs text-muted-foreground font-sans">{t('checkout_qty')} {quantity}</p>
                       </div>
-                      <span className="text-xs font-semibold font-sans flex-shrink-0">{(product.price * quantity).toFixed(2)} {currency}</span>
+                      <span className="text-xs font-semibold font-sans flex-shrink-0">{(Number(product.price) * quantity).toFixed(2)} {currency}</span>
                     </div>
                   ))}
                 </div>

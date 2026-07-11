@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../db.js';
 import { authMiddleware, requireAdmin } from '../middleware/auth.js';
 export const shippingRoutes = Router();
@@ -7,7 +8,7 @@ shippingRoutes.get('/', async (req, res) => {
     const showAll = req.query.all === 'true';
     try {
         const whereClause = showAll ? '' : 'WHERE is_active = true';
-        const { rows } = await pool.query(`SELECT * FROM shipping_method ${whereClause} ORDER BY price ASC`);
+        const { rows } = await pool.query(`SELECT id, name, description, CAST(price AS NUMERIC(10,2)) AS price, is_active, created_at FROM shipping_method ${whereClause} ORDER BY price ASC`);
         res.json(rows);
     }
     catch (error) {
@@ -22,7 +23,7 @@ shippingRoutes.post('/', authMiddleware, requireAdmin, async (req, res) => {
     }
     try {
         const insert = 'INSERT INTO shipping_method(id, name, description, price, is_active, created_at) VALUES($1,$2,$3,$4,$5,NOW()) RETURNING *';
-        const id = require('uuid').v4();
+        const id = uuidv4();
         const { rows } = await pool.query(insert, [id, name, description || null, Number(price), isActive !== undefined ? Boolean(isActive) : true]);
         res.status(201).json(rows[0]);
     }

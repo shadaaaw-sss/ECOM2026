@@ -11,7 +11,7 @@ categoriesRoutes.get('/', async (req, res) => {
   const showAll = all && (userRole === 'ADMIN' || userRole === 'SUPERADMIN');
   try {
     const whereClause = showAll ? '' : 'WHERE is_active = true';
-    const { rows } = await pool.query(`SELECT * FROM category ${whereClause} ORDER BY sort_order ASC`);
+    const { rows } = await pool.query(`SELECT id, name, description, image_url, parent_id, CAST(sort_order AS INTEGER) AS sort_order, is_active, created_at FROM category ${whereClause} ORDER BY sort_order ASC`);
     res.json(rows);
   } catch (error: any) {
     res.status(500).json({ message: error.message || 'Failed to fetch categories' });

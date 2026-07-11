@@ -84,8 +84,8 @@ export default function CartPage() {
                       </button>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold font-sans text-sm">{(product.price * quantity).toFixed(2)} {currency}</p>
-                      {quantity > 1 && <p className="text-xs text-muted-foreground font-sans">{product.price.toFixed(2)} {t('cart_each')}</p>}
+                      <p className="font-semibold font-sans text-sm">{(Number(product.price) * quantity).toFixed(2)} {currency}</p>
+                      {quantity > 1 && <p className="text-xs text-muted-foreground font-sans">{(Number(product.price) || 0).toFixed(2)} {t('cart_each')}</p>}
                     </div>
                   </div>
                 </div>
@@ -100,17 +100,17 @@ export default function CartPage() {
               <div className="space-y-3 mb-5 text-sm font-sans">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">{t('cart_subtotal')} ({itemCount} {itemCount !== 1 ? t('cart_items') : t('cart_item')})</span>
-                  <span className="font-medium">{subtotal.toFixed(2)} {currency}</span>
+                  <span className="font-medium">{(Number(subtotal) || 0).toFixed(2)} {currency}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">{t('cart_shipping')}</span>
-                  <span className="font-medium">{shippingFee.toFixed(2)} {currency}</span>
+                  <span className="font-medium">{(Number(shippingFee) || 0).toFixed(2)} {currency}</span>
                 </div>
               </div>
               <div className="border-t border-beige-100 pt-4 mb-5">
                 <div className="flex justify-between items-center">
                   <span className="font-sans font-semibold text-foreground">{t('cart_total')}</span>
-                  <span className="font-serif text-2xl font-bold text-foreground">{total.toFixed(2)} {currency}</span>
+                  <span className="font-serif text-2xl font-bold text-foreground">{(Number(total) || 0).toFixed(2)} {currency}</span>
                 </div>
               </div>
               <Link href="/checkout" className="btn-primary w-full flex items-center justify-center gap-2 mb-3">

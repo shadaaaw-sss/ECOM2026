@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../db.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { sendEmail, verificationEmailHtml, resetPasswordEmailHtml } from '../utils/email.js';
@@ -14,7 +15,7 @@ authRoutes.post('/register', async (req, res) => {
         if ((existingRes.rowCount ?? 0) > 0)
             return res.status(409).json({ message: 'User already exists' });
         const passwordHash = await bcrypt.hash(password, 10);
-        const id = require('uuid').v4();
+        const id = uuidv4();
         await pool.query('INSERT INTO "user"(id,email,password,role,is_email_verified,created_at) VALUES($1,$2,$3,$4,$5,NOW())', [id, email, passwordHash, 'USER', false]);
         // send verification email
         try {

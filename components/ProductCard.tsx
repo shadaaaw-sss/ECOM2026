@@ -35,18 +35,18 @@ export default function ProductCard({ product, wishlistIds = [], onWishlistChang
     onWishlistChange?.();
   };
 
-  const discountAmount = product.originalPrice
-    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
-    : product.discountPercent || 0;
+  const discountAmount = product.original_price
+    ? Math.round(((Number(product.original_price) - Number(product.price)) / Number(product.original_price)) * 100)
+    : Number(product.discount_percent || product.discountPercent || 0);
 
   return (
     <Link href={`/products/${product.id}`} className="group block">
       <div className="bg-white rounded-xl overflow-hidden border border-beige-100 hover:border-beige-200 hover:shadow-lg transition-all duration-300">
         {/* Image */}
         <div className="relative overflow-hidden bg-beige-50 aspect-square">
-          {product.thumbnailUrl ? (
+          {(product.thumbnail_url || product.thumbnailUrl || '') ? (
             <img
-              src={product.thumbnailUrl}
+              src={product.thumbnail_url || product.thumbnailUrl || ''}
               alt={product.name}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
@@ -103,10 +103,10 @@ export default function ProductCard({ product, wishlistIds = [], onWishlistChang
           </h3>
           <div className="flex items-center justify-between mt-auto">
             <div>
-              <span className="text-base font-semibold font-sans text-foreground">{product.price.toFixed(2)} {currency}</span>
-              {product.originalPrice && (
+              <span className="text-base font-semibold font-sans text-foreground">{(Number(product.price) || 0).toFixed(2)} {currency}</span>
+              {(product.original_price || product.originalPrice) && (
                 <span className="text-xs font-sans text-muted-foreground line-through ml-2">
-                  {product.originalPrice.toFixed(2)}
+                  {(Number(product.original_price || product.originalPrice) || 0).toFixed(2)}
                 </span>
               )}
             </div>

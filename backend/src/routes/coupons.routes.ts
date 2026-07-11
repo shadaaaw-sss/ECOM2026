@@ -23,7 +23,7 @@ couponsRoutes.get('/:code', async (req, res) => {
 // GET /api/coupons - List all coupons (admin only)
 couponsRoutes.get('/', authMiddleware, requireAdmin, async (_req, res) => {
   try {
-    const { rows } = await pool.query('SELECT * FROM coupon ORDER BY created_at DESC');
+    const { rows } = await pool.query('SELECT id, code, CAST(discount_percent AS INTEGER) AS discount_percent, starts_at, ends_at, created_at FROM coupon ORDER BY created_at DESC');
     res.json(rows);
   } catch (error: any) {
     res.status(500).json({ message: error.message || 'Failed to fetch coupons' });

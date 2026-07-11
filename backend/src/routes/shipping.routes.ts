@@ -10,7 +10,7 @@ shippingRoutes.get('/', async (req, res) => {
   const showAll = req.query.all === 'true';
   try {
     const whereClause = showAll ? '' : 'WHERE is_active = true';
-    const { rows } = await pool.query(`SELECT * FROM shipping_method ${whereClause} ORDER BY price ASC`);
+    const { rows } = await pool.query(`SELECT id, name, description, CAST(price AS NUMERIC(10,2)) AS price, is_active, created_at FROM shipping_method ${whereClause} ORDER BY price ASC`);
     res.json(rows);
   } catch (error: any) {
     res.status(500).json({ message: error.message || 'Failed to fetch shipping methods' });

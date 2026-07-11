@@ -162,9 +162,9 @@ export default function ProductDetailPage() {
 
             {/* Price */}
             <div className={`flex items-baseline gap-3 mb-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
-              <span className="text-3xl font-bold font-sans text-foreground">{product.price.toFixed(2)} {currency}</span>
+              <span className="text-3xl font-bold font-sans text-foreground">{(Number(product.price) || 0).toFixed(2)} {currency}</span>
               {(product as any).original_price && (
-                <span className="text-lg font-sans text-muted-foreground line-through">{(product as any).original_price.toFixed(2)}</span>
+                <span className="text-lg font-sans text-muted-foreground line-through">{(Number((product as any).original_price) || 0).toFixed(2)}</span>
               )}
               {discountAmount > 0 && (
                 <span className="badge-discount">-{discountAmount}%</span>
@@ -172,7 +172,7 @@ export default function ProductDetailPage() {
             </div>
             {savings > 0 && (
               <p className="text-green-600 text-sm font-sans font-medium mb-4">
-                {t('product_you_save')} {savings.toFixed(2)} {currency}
+                {t('product_you_save')} {(Number(savings) || 0).toFixed(2)} {currency}
               </p>
             )}
 

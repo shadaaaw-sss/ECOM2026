@@ -22,6 +22,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Use a single token key everywhere
 const AUTH_TOKEN_KEY = 'makhmal_token';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -35,12 +36,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Also sync to admin_token for admin page compatibility
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('admin_token', token);
+    }
+
     api.get<{ user: AuthUser }>('/auth/me')
       .then((response) => {
         setUser(response.user);
       })
       .catch(() => {
         window.localStorage.removeItem(AUTH_TOKEN_KEY);
+        window.localStorage.removeItem('admin_token');
         setUser(null);
       })
       .finally(() => setLoading(false));
@@ -51,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await api.post<{ token: string; user: AuthUser }>('/auth/login', { email, password });
       if (typeof window !== 'undefined') {
         window.localStorage.setItem(AUTH_TOKEN_KEY, response.token);
+        window.localStorage.setItem('admin_token', response.token);
       }
       setUser(response.user);
       return { error: null };
@@ -71,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem(AUTH_TOKEN_KEY);
+      window.localStorage.removeItem('admin_token');
       window.location.href = '/';
     } else {
       setUser(null);

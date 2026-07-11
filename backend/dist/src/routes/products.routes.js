@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../db.js';
 import { authMiddleware, requireAdmin, getUserRoleFromHeader } from '../middleware/auth.js';
 export const productsRoutes = Router();
@@ -18,6 +19,20 @@ const parseSort = (sort) => {
         default:
             return { created_at: direction };
     }
+};
+const queryWithRetry = async (text, params) => {
+    const maxRetries = 2;
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            return await pool.query(text, params);
+        }
+        catch (err) {
+            if (i === maxRetries - 1)
+                throw err;
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    }
+    throw new Error('Query failed after retries');
 };
 productsRoutes.get('/', async (req, res) => {
     const { q, filter, category, brand, sort = 'created_at_desc', min_price, max_price, page = '1', limit = '12', excludeId, all, } = req.query;
@@ -80,7 +95,7 @@ productsRoutes.get('/', async (req, res) => {
             idx++;
         }
         const whereSql = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
-        const countRes = await pool.query(`SELECT COUNT(*)::int AS count FROM product p ${whereParts.length ? 'WHERE ' + whereParts.join(' AND ') : ''}`, values);
+        const countRes = await queryWithRetry(`SELECT COUNT(*)::int AS count FROM product p ${whereParts.length ? 'WHERE ' + whereParts.join(' AND ') : ''}`, values);
         const total = countRes.rows[0].count;
         const orderField = Object.keys(orderBy)[0];
         const orderDir = Object.values(orderBy)[0];
@@ -92,12 +107,12 @@ productsRoutes.get('/', async (req, res) => {
         p.name,
         p.description,
         CAST(p.price AS DOUBLE PRECISION) AS price,
+        CAST(p.original_price AS DOUBLE PRECISION) AS original_price,
+        p.discount_percent,
         p.brand_id,
         p.category_id,
         p.thumbnail_url,
-        p.stock,
-        CAST(p.original_price AS DOUBLE PRECISION) AS original_price,
-        p.discount_percent,
+        CAST(p.stock AS INTEGER) AS stock,
         p.is_featured,
         p.is_new,
         p.is_active,
@@ -112,27 +127,28 @@ productsRoutes.get('/', async (req, res) => {
       LIMIT $${idx} OFFSET $${idx + 1}
     `;
         values.push(take, skip);
-        const productsRes = await pool.query(sql, values);
+        const productsRes = await queryWithRetry(sql, values);
         res.json({ data: productsRes.rows, total });
     }
     catch (error) {
+        console.error('Products list error:', error);
         res.status(500).json({ message: error.message || 'Failed to fetch products' });
     }
 });
 productsRoutes.get('/:id', async (req, res) => {
     try {
-        const { rows } = await pool.query(`
+        const { rows } = await queryWithRetry(`
       SELECT
         p.id,
         p.name,
         p.description,
         CAST(p.price AS DOUBLE PRECISION) AS price,
+        CAST(p.original_price AS DOUBLE PRECISION) AS original_price,
+        p.discount_percent,
         p.brand_id,
         p.category_id,
         p.thumbnail_url,
-        p.stock,
-        CAST(p.original_price AS DOUBLE PRECISION) AS original_price,
-        p.discount_percent,
+        CAST(p.stock AS INTEGER) AS stock,
         p.is_featured,
         p.is_new,
         p.is_active,
@@ -150,26 +166,42 @@ productsRoutes.get('/:id', async (req, res) => {
         res.json(product);
     }
     catch (error) {
+        console.error('Product detail error:', error);
         res.status(500).json({ message: error.message || 'Failed to fetch product' });
     }
 });
 productsRoutes.post('/', authMiddleware, requireAdmin, async (req, res) => {
-    const { name, description, shortDescription, brandId, categoryId, subCategoryId, price, originalPrice, discountPercent, stock, weight, dimensions, tags, thumbnailUrl, isFeatured, isNew, isActive, metaTitle, metaDescription, images, } = req.body;
+    const { name, description, brandId, categoryId, price, originalPrice, discountPercent, stock, thumbnailUrl, isFeatured, isNew, isActive, } = req.body;
     if (!name || price === undefined) {
         return res.status(400).json({ message: 'Name and price are required' });
     }
     try {
-        const id = require('uuid').v4();
-        const insert = `INSERT INTO product(id,name,description,price,brand_id,is_active,created_at) VALUES($1,$2,$3,$4,$5,$6,NOW()) RETURNING *`;
-        const { rows } = await pool.query(insert, [id, name, description || null, Number(price), brandId || null, isActive !== undefined ? Boolean(isActive) : true]);
+        const id = uuidv4();
+        const { rows } = await queryWithRetry(`INSERT INTO product(id, name, description, price, brand_id, category_id, thumbnail_url, stock, original_price, discount_percent, is_featured, is_new, is_active, created_at)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW()) RETURNING *`, [
+            id,
+            name,
+            description || null,
+            Number(price),
+            brandId || null,
+            categoryId || null,
+            thumbnailUrl || null,
+            stock !== undefined ? Number(stock) : 10,
+            originalPrice !== undefined ? Number(originalPrice) : null,
+            discountPercent !== undefined ? Number(discountPercent) : 0,
+            Boolean(isFeatured),
+            Boolean(isNew),
+            isActive !== undefined ? Boolean(isActive) : true,
+        ]);
         res.status(201).json(rows[0]);
     }
     catch (error) {
+        console.error('Create product error:', error);
         res.status(500).json({ message: error.message || 'Failed to create product' });
     }
 });
 productsRoutes.patch('/:id', authMiddleware, requireAdmin, async (req, res) => {
-    const { name, description, shortDescription, brandId, categoryId, subCategoryId, price, originalPrice, discountPercent, stock, weight, dimensions, tags, thumbnailUrl, isFeatured, isNew, isActive, metaTitle, metaDescription, images, } = req.body;
+    const { name, description, brandId, categoryId, price, originalPrice, discountPercent, stock, thumbnailUrl, isFeatured, isNew, isActive, } = req.body;
     try {
         const fields = [];
         const values = [];
@@ -186,9 +218,37 @@ productsRoutes.patch('/:id', authMiddleware, requireAdmin, async (req, res) => {
             fields.push(`brand_id = $${idx++}`);
             values.push(brandId || null);
         }
+        if (categoryId !== undefined) {
+            fields.push(`category_id = $${idx++}`);
+            values.push(categoryId || null);
+        }
         if (price !== undefined) {
             fields.push(`price = $${idx++}`);
             values.push(Number(price));
+        }
+        if (originalPrice !== undefined) {
+            fields.push(`original_price = $${idx++}`);
+            values.push(originalPrice !== null ? Number(originalPrice) : null);
+        }
+        if (discountPercent !== undefined) {
+            fields.push(`discount_percent = $${idx++}`);
+            values.push(Number(discountPercent));
+        }
+        if (stock !== undefined) {
+            fields.push(`stock = $${idx++}`);
+            values.push(Number(stock));
+        }
+        if (thumbnailUrl !== undefined) {
+            fields.push(`thumbnail_url = $${idx++}`);
+            values.push(thumbnailUrl || null);
+        }
+        if (isFeatured !== undefined) {
+            fields.push(`is_featured = $${idx++}`);
+            values.push(Boolean(isFeatured));
+        }
+        if (isNew !== undefined) {
+            fields.push(`is_new = $${idx++}`);
+            values.push(Boolean(isNew));
         }
         if (isActive !== undefined) {
             fields.push(`is_active = $${idx++}`);
@@ -198,19 +258,21 @@ productsRoutes.patch('/:id', authMiddleware, requireAdmin, async (req, res) => {
             return res.status(400).json({ message: 'No fields to update' });
         const sql = `UPDATE product SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`;
         values.push(String(req.params.id));
-        const { rows } = await pool.query(sql, values);
+        const { rows } = await queryWithRetry(sql, values);
         res.json(rows[0]);
     }
     catch (error) {
+        console.error('Update product error:', error);
         res.status(500).json({ message: error.message || 'Failed to update product' });
     }
 });
 productsRoutes.delete('/:id', authMiddleware, requireAdmin, async (req, res) => {
     try {
-        await pool.query('DELETE FROM product WHERE id = $1', [String(req.params.id)]);
+        await queryWithRetry('DELETE FROM product WHERE id = $1', [String(req.params.id)]);
         res.json({ ok: true });
     }
     catch (error) {
+        console.error('Delete product error:', error);
         res.status(500).json({ message: error.message || 'Failed to delete product' });
     }
 });

@@ -6,14 +6,14 @@ import Link from 'next/link';
 import {
   LayoutDashboard, Package, Tag, ShoppingBag, Users, Star, Settings,
   TrendingUp, AlertTriangle, Plus, Pencil, Trash2, Eye, Check, X, ChevronDown,
-  Globe, LayoutGrid, Calendar, Hash, ArrowUpRight, Truck
+  Globe, LayoutGrid, Calendar, Hash, ArrowUpRight, Truck, FileText, Search
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { Product, Category, Brand, Order } from '@/lib/types';
 
-type AdminTab = 'dashboard' | 'products' | 'categories' | 'brands' | 'orders' | 'newsletter' | 'shipping';
+type AdminTab = 'dashboard' | 'products' | 'categories' | 'brands' | 'orders' | 'factures' | 'newsletter' | 'shipping';
 
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-amber-50 border border-amber-200 text-amber-700',
@@ -41,6 +41,13 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [shippingMethods, setShippingMethods] = useState<any[]>([]);
+  const [factures, setFactures] = useState<any[]>([]);
+  const [factureFormOpen, setFactureFormOpen] = useState(false);
+  const [factureForm, setFactureForm] = useState({ customerName: '', customerPhone: '', customerEmail: '', notes: '', items: [] as any[] });
+  const [factureProductSearch, setFactureProductSearch] = useState('');
+  const [factureQuantity, setFactureQuantity] = useState(1);
+  const [facturePrice, setFacturePrice] = useState('0');
+  const [factureSelectedProduct, setFactureSelectedProduct] = useState<any>(null);
 
   // Shipping Form State
   const [shippingFormOpen, setShippingFormOpen] = useState(false);
@@ -414,9 +421,19 @@ export default function AdminPage() {
   }, [tab, isAdmin]);
 
   const updateOrderStatus = async (orderId: string, status: string) => {
-    await api.patch(`/orders/${orderId}`, { status });
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: status as Order['status'] } : o));
-    setRecentOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: status as Order['status'] } : o));
+    try {
+      await api.patch(`/orders/${orderId}`, { status });
+      // Refresh orders list to ensure sync
+      const ordersData = await api.get<Order[]>('/orders?all=true');
+      if (ordersData) {
+        setOrders(ordersData as Order[]);
+        setRecentOrders(ordersData.slice(0, 8) as Order[]);
+        alert('Order status updated successfully');
+      }
+    } catch (error) {
+      console.error('Failed to update order status:', error);
+      alert('Failed to update order status');
+    }
   };
 
   const toggleProductActive = async (id: string, is_active: boolean) => {
@@ -552,6 +569,7 @@ export default function AdminPage() {
     { icon: Tag, label: t('admin_categories'), tab: 'categories' },
     { icon: Star, label: t('admin_brands'), tab: 'brands' },
     { icon: ShoppingBag, label: t('admin_orders'), tab: 'orders' },
+    { icon: FileText, label: 'Factures', tab: 'factures' },
     { icon: Truck, label: t('admin_shipping' as any) || 'Delivery', tab: 'shipping' },
     { icon: Users, label: t('admin_newsletter'), tab: 'newsletter' },
   ];
@@ -559,7 +577,7 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-[#faf8f6] flex text-[#2d2224]" dir={isRTL ? 'rtl' : 'ltr'}>
       {/* Sidebar */}
-      <aside className={`w-64 bg-[#180a0e] text-white flex-shrink-0 flex flex-col border-r border-[#2a171c] ${isRTL ? 'order-last border-l border-r-0' : ''}`}>
+      <aside className={`w-64 bg-[#180a0e] text-white flex-shrink-0 flex flex-col border-r border-[#2a171c] ${isRTL ? 'order-last border-l border-r-0' : ''} h-screen sticky top-0`}>
         <div className="p-6 border-b border-white/5 flex flex-col gap-4">
           <div className={`flex items-center gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
             <div className="w-10 h-10 rounded-full overflow-hidden bg-white flex items-center justify-center relative shadow-md">
@@ -656,7 +674,7 @@ export default function AdminPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[
                   { label: t('admin_total_orders'), value: stats.orders, sub: 'All lifetime orders', icon: ShoppingBag, color: 'bg-emerald-500/10 text-emerald-700' },
-                  { label: t('admin_revenue'), value: `${stats.revenue.toFixed(0)} ${currency}`, sub: 'Excluding cancelled', icon: TrendingUp, color: 'bg-burgundy-700/10 text-burgundy-700' },
+                  { label: t('admin_revenue'), value: `${(Number(stats.revenue) || 0).toFixed(0)} ${currency}`, sub: 'Excluding cancelled', icon: TrendingUp, color: 'bg-burgundy-700/10 text-burgundy-700' },
                   { label: t('admin_products_count'), value: stats.products, sub: 'Total items in store', icon: Package, color: 'bg-violet-500/10 text-violet-700' },
                   { label: t('admin_customers'), value: stats.customers, sub: 'Unique buyers', icon: Users, color: 'bg-amber-500/10 text-amber-700' },
                 ].map(stat => (
@@ -720,7 +738,7 @@ export default function AdminPage() {
                           <td className={`px-6 py-4 ${isRTL ? 'text-right' : ''}`}>
                             <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${STATUS_COLORS[order.status]}`}>{order.status}</span>
                           </td>
-                          <td className={`px-6 py-4 font-bold text-xs ${isRTL ? 'text-left' : 'text-right'}`}>{order.total.toFixed(2)} {currency}</td>
+                          <td className={`px-6 py-4 font-bold text-xs ${isRTL ? 'text-left' : 'text-right'}`}>{(Number(order.total) || 0).toFixed(2)} {currency}</td>
                         </tr>
                       )) : (
                         <tr>
@@ -1033,7 +1051,7 @@ export default function AdminPage() {
                           </td>
                           <td className={`px-6 py-4 hidden md:table-cell text-xs text-muted-foreground font-semibold ${isRTL ? 'text-right' : ''}`}>{p.brand?.name || '-'}</td>
                           <td className={`px-6 py-4 hidden md:table-cell text-xs text-muted-foreground font-semibold ${isRTL ? 'text-right' : ''}`}>{p.category?.name || '-'}</td>
-                          <td className={`px-6 py-4 text-xs font-bold ${isRTL ? 'text-left' : 'text-right'}`}>{p.price.toFixed(2)} {currency}</td>
+                          <td className={`px-6 py-4 text-xs font-bold ${isRTL ? 'text-left' : 'text-right'}`}>{(Number(p.price) || 0).toFixed(2)} {currency}</td>
                           <td className="px-6 py-4 text-center">
                             <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${p.stock === 0 ? 'bg-red-50 text-red-700 border border-red-200' : p.stock <= 5 ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>{p.stock}</span>
                           </td>
@@ -1325,7 +1343,7 @@ export default function AdminPage() {
                               ))}
                             </select>
                           </td>
-                          <td className={`px-6 py-4 font-bold text-xs ${isRTL ? 'text-left' : 'text-right'}`}>{order.total.toFixed(2)} {currency}</td>
+                          <td className={`px-6 py-4 font-bold text-xs ${isRTL ? 'text-left' : 'text-right'}`}>{(Number(order.total) || 0).toFixed(2)} {currency}</td>
                         </tr>
                       )) : (
                         <tr>
@@ -1410,7 +1428,7 @@ export default function AdminPage() {
                       <tr key={method.id} className="border-b border-gray-50/50 hover:bg-gray-50/30">
                         <td className={`px-6 py-4 text-xs font-bold text-foreground ${isRTL ? 'text-right' : ''}`}>{method.name}</td>
                         <td className={`px-6 py-4 hidden md:table-cell text-xs text-muted-foreground font-semibold ${isRTL ? 'text-right' : ''}`}>{method.description || '-'}</td>
-                        <td className={`px-6 py-4 text-xs font-bold ${isRTL ? 'text-left' : 'text-right'}`}>{method.price.toFixed(2)} {currency}</td>
+                        <td className={`px-6 py-4 text-xs font-bold ${isRTL ? 'text-left' : 'text-right'}`}>{(Number(method.price) || 0).toFixed(2)} {currency}</td>
                         <td className="px-6 py-4 text-center">
                           <button onClick={() => toggleShippingActive(method.id, method.isActive ?? false)} className={`px-2.5 py-1 border rounded-full text-[10px] font-bold uppercase transition-all ${method.isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}>
                             {method.isActive ? t('admin_active') : t('admin_inactive')}
@@ -1430,6 +1448,260 @@ export default function AdminPage() {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* Factures Tab */}
+          {tab === 'factures' && (
+            <div className="space-y-6 animate-in fade-in duration-300">
+                <div className={`flex items-center justify-between mb-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                <div className={isRTL ? 'text-right' : ''}>
+                  <h1 className="font-serif text-3xl font-bold text-[#1f1517]">{t('admin_factures')}</h1>
+                  <p className="text-muted-foreground text-sm mt-1">{factures.length} {t('admin_factures_no_factures').toLowerCase()}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setFactureForm({ customerName: '', customerPhone: '', customerEmail: '', notes: '', items: [] });
+                    setFactureProductSearch('');
+                    setFactureQuantity(1);
+                    setFacturePrice('0');
+                    setFactureSelectedProduct(null);
+                    setFactureFormOpen(true);
+                  }}
+                  className={`inline-flex items-center gap-2 rounded-full bg-burgundy-700 hover:bg-burgundy-800 shadow-md text-white px-5 py-2.5 text-xs font-sans font-bold transition-all ${isRTL ? 'flex-row-reverse' : ''}`}
+                >
+                  <Plus size={14} /> {t('admin_factures_create')}
+                </button>
+              </div>
+
+              {/* Facture Form Modal */}
+              {factureFormOpen && (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-lg p-6 animate-in slide-in-from-top-6 duration-300">
+                  <div className={`flex items-center justify-between mb-5 pb-3 border-b border-gray-50 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                    <h2 className="font-serif text-lg font-bold text-foreground">{t('admin_factures_manual_sale')}</h2>
+                    <button onClick={() => setFactureFormOpen(false)} className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-muted-foreground transition">
+                      <X size={16} />
+                    </button>
+                  </div>
+                  
+                  {/* Customer Info */}
+                  <div className="grid gap-4 md:grid-cols-3 mb-6">
+                    <div className="grid gap-1.5">
+                      <label className="text-xs font-semibold text-slate-700">{t('admin_factures_customer')}</label>
+                      <input value={factureForm.customerName} onChange={e => setFactureForm(f => ({ ...f, customerName: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" placeholder={t('admin_factures_walk_in')} />
+                    </div>
+                    <div className="grid gap-1.5">
+                      <label className="text-xs font-semibold text-slate-700">{t('admin_factures_phone')}</label>
+                      <input value={factureForm.customerPhone} onChange={e => setFactureForm(f => ({ ...f, customerPhone: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />
+                    </div>
+                    <div className="grid gap-1.5">
+                      <label className="text-xs font-semibold text-slate-700">{t('admin_factures_email')}</label>
+                      <input value={factureForm.customerEmail} onChange={e => setFactureForm(f => ({ ...f, customerEmail: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />
+                    </div>
+                  </div>
+
+                  {/* Product Search & Add */}
+                  <div className="border border-gray-100 rounded-xl p-4 mb-4">
+                    <label className="text-xs font-semibold text-slate-700 mb-2 block">{t('admin_factures_add_products')}</label>
+                    <div className="flex gap-2 mb-3">
+                      <div className="relative flex-1">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        <input
+                          value={factureProductSearch}
+                          onChange={e => setFactureProductSearch(e.target.value)}
+                          className="w-full rounded-xl border border-gray-200 pl-9 pr-3 py-2 text-sm"
+                          placeholder={t('admin_factures_search')}
+                        />
+                      </div>
+                    </div>
+                    {factureProductSearch && (
+                      <div className="max-h-40 overflow-y-auto border border-gray-100 rounded-xl mb-3">
+                        {products
+                          .filter(p => p.name.toLowerCase().includes(factureProductSearch.toLowerCase()))
+                          .slice(0, 8)
+                          .map(p => (
+                            <button
+                              key={p.id}
+                              onClick={() => {
+                                setFactureSelectedProduct(p);
+                                setFacturePrice(String(p.price));
+                                setFactureQuantity(1);
+                                setFactureProductSearch('');
+                              }}
+                              className="w-full text-left px-4 py-2.5 text-sm hover:bg-beige-50 border-b border-gray-50 flex items-center gap-3"
+                            >
+                              {p.thumbnailUrl || p.thumbnail_url ? (
+                                <img src={p.thumbnailUrl || p.thumbnail_url || ''} alt={p.name} className="w-8 h-8 object-cover rounded" />
+                              ) : (
+                                <div className="w-8 h-8 bg-beige-50 rounded flex items-center justify-center"><Package size={12} /></div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium truncate">{p.name}</p>
+                                <p className="text-xs text-muted-foreground">{(Number(p.price) || 0).toFixed(2)} QAR • Stock: {p.stock}</p>
+                              </div>
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                    {factureSelectedProduct && (
+                      <div className="flex items-center gap-3 p-3 bg-beige-50 rounded-xl">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm">{factureSelectedProduct.name}</p>
+                          <p className="text-xs text-muted-foreground">{(Number(factureSelectedProduct.price) || 0).toFixed(2)} QAR each</p>
+                        </div>
+                        <input
+                          type="number"
+                          min="1"
+                          max={factureSelectedProduct.stock}
+                          value={factureQuantity}
+                          onChange={e => setFactureQuantity(Number(e.target.value))}
+                          className="w-16 text-center rounded-xl border border-gray-200 px-2 py-1.5 text-sm"
+                        />
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={facturePrice}
+                          onChange={e => setFacturePrice(e.target.value)}
+                          className="w-20 text-center rounded-xl border border-gray-200 px-2 py-1.5 text-sm"
+                        />
+                        <button
+                          onClick={() => {
+                            const existing = factureForm.items.findIndex(i => i.productId === factureSelectedProduct.id);
+                            if (existing >= 0) {
+                              const updated = [...factureForm.items];
+                              updated[existing].quantity += factureQuantity;
+                              setFactureForm(f => ({ ...f, items: updated }));
+                            } else {
+                              setFactureForm(f => ({
+                                ...f,
+                                items: [...f.items, {
+                                  productId: factureSelectedProduct.id,
+                                  productName: factureSelectedProduct.name,
+                                  productThumbnail: factureSelectedProduct.thumbnailUrl || factureSelectedProduct.thumbnail_url,
+                                  price: Number(facturePrice),
+                                  quantity: factureQuantity,
+                                }]
+                              }));
+                            }
+                            setFactureSelectedProduct(null);
+                            setFacturePrice('0');
+                            setFactureQuantity(1);
+                          }}
+                          className="btn-primary text-xs px-3 py-1.5"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Items List */}
+                  {factureForm.items.length > 0 && (
+                    <div className="mb-4">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-100">
+                            <th className="text-left py-2 text-xs font-semibold uppercase text-muted-foreground">Product</th>
+                            <th className="text-center py-2 text-xs font-semibold uppercase text-muted-foreground">Qty</th>
+                            <th className="text-right py-2 text-xs font-semibold uppercase text-muted-foreground">Price</th>
+                            <th className="text-right py-2 text-xs font-semibold uppercase text-muted-foreground">Subtotal</th>
+                            <th className="py-2 w-8"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {factureForm.items.map((item, i) => (
+                            <tr key={i} className="border-b border-gray-50">
+                              <td className="py-2 text-sm font-medium">{item.productName}</td>
+                              <td className="py-2 text-center">{item.quantity}</td>
+                              <td className="py-2 text-right">{(Number(item.price) || 0).toFixed(2)} QAR</td>
+                              <td className="py-2 text-right font-semibold">{(Number(item.price) * item.quantity).toFixed(2)} QAR</td>
+                              <td className="py-2">
+                                <button
+                                  onClick={() => setFactureForm(f => ({ ...f, items: f.items.filter((_, idx) => idx !== i) }))}
+                                  className="text-red-500 hover:text-red-700"
+                                >
+                                  <X size={14} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <td colSpan={3} className="py-3 text-right font-bold text-sm">Total:</td>
+                            <td className="py-3 text-right font-bold text-sm font-serif text-lg">
+                              {factureForm.items.reduce((sum, item) => sum + (Number(item.price) * item.quantity), 0).toFixed(2)} QAR
+                            </td>
+                            <td></td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Notes */}
+                  <div className="grid gap-1.5 mb-4">
+                    <label className="text-xs font-semibold text-slate-700">{t('admin_factures_notes')}</label>
+                    <textarea value={factureForm.notes} onChange={e => setFactureForm(f => ({ ...f, notes: e.target.value }))} rows={2} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />
+                  </div>
+
+                  {/* Submit */}
+                  <div className="flex justify-end gap-3 pt-3 border-t border-gray-50">
+                    <button onClick={() => setFactureFormOpen(false)} className="btn-outline text-xs">{t('admin_factures_cancel')}</button>
+                      <button
+                      onClick={async () => {
+                        if (!factureForm.items.length) return alert(t('admin_factures_no_factures'));
+                        try {
+                          await api.post('/factures', factureForm);
+                          alert('✅ ' + t('admin_factures_created'));
+                          setFactureFormOpen(false);
+                          const f = await api.get<any[]>('/factures');
+                          setFactures(f || []);
+                        } catch (e) {
+                          alert('❌ ' + t('admin_factures_failed'));
+                        }
+                      }}
+                      disabled={!factureForm.items.length}
+                      className="btn-primary text-xs"
+                    >
+                      {t('admin_factures_create_button')}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Factures List */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm font-sans">
+                    <thead>
+                      <tr className="border-b border-gray-50 bg-gray-50/50 text-[#857375]">
+                        <th className={`${isRTL ? 'text-right' : 'text-left'} px-6 py-4 text-xs font-semibold uppercase tracking-wider`}>Facture #</th>
+                        <th className={`${isRTL ? 'text-right' : 'text-left'} px-6 py-4 text-xs font-semibold uppercase tracking-wider`}>Customer</th>
+                        <th className={`${isRTL ? 'text-right' : 'text-left'} px-6 py-4 text-xs font-semibold uppercase tracking-wider`}>Date</th>
+                        <th className={`${isRTL ? 'text-left' : 'text-right'} px-6 py-4 text-xs font-semibold uppercase tracking-wider`}>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {factures.length > 0 ? factures.map(f => (
+                        <tr key={f.id} className="border-b border-gray-50/50 hover:bg-gray-50/30">
+                          <td className={`px-6 py-4 font-mono text-xs font-bold text-foreground ${isRTL ? 'text-right' : ''}`}>#{f.facture_number}</td>
+                          <td className={`px-6 py-4 ${isRTL ? 'text-right' : ''}`}>
+                            <p className="font-semibold text-xs">{f.first_name} {f.last_name}</p>
+                            <p className="text-[10px] text-muted-foreground">{f.email}</p>
+                          </td>
+                          <td className={`px-6 py-4 text-xs text-muted-foreground ${isRTL ? 'text-right' : ''}`}>
+                            {new Date(f.created_at).toLocaleDateString()}
+                          </td>
+                          <td className={`px-6 py-4 font-bold text-xs ${isRTL ? 'text-left' : 'text-right'}`}>{(Number(f.total) || 0).toFixed(2)} {currency}</td>
+                        </tr>
+                      )) : (
+                        <tr><td colSpan={4} className="py-8 text-center text-muted-foreground font-sans text-xs">No factures yet</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}

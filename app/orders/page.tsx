@@ -77,7 +77,7 @@ export default function OrdersPage() {
                     </p>
                   </div>
                   <div className={`flex-shrink-0 ${isRTL ? 'text-left' : 'text-right'}`}>
-                    <p className="font-serif font-bold text-lg">{order.total.toFixed(2)} {currency}</p>
+                    <p className="font-serif font-bold text-lg">{(Number(order.total) || 0).toFixed(2)} {currency}</p>
                     <button
                       onClick={() => setExpanded(expanded === order.id ? null : order.id)}
                       className={`text-xs font-sans text-burgundy-700 hover:underline flex items-center gap-1 ${isRTL ? 'mr-auto' : 'ml-auto'} mt-1 ${isRTL ? 'flex-row-reverse' : ''}`}
@@ -101,17 +101,17 @@ export default function OrdersPage() {
                             {item.brand_name && <p className="text-xs text-muted-foreground font-sans">{item.brand_name}</p>}
                           </div>
                           <div className={`text-sm font-sans ${isRTL ? 'text-left' : 'text-right'}`}>
-                            <p className="font-medium">{item.subtotal.toFixed(2)} {currency}</p>
+                            <p className="font-medium">{(Number(item.subtotal) || 0).toFixed(2)} {currency}</p>
                             <p className="text-xs text-muted-foreground">{t('checkout_qty')} {item.quantity}</p>
                           </div>
                         </div>
                       ))}
                     </div>
                     <div className="border-t border-beige-200 pt-3 space-y-1 text-xs font-sans">
-                      <div className={`flex justify-between text-muted-foreground ${isRTL ? 'flex-row-reverse' : ''}`}><span>{t('checkout_subtotal')}</span><span>{order.subtotal.toFixed(2)} {currency}</span></div>
-                      <div className={`flex justify-between text-muted-foreground ${isRTL ? 'flex-row-reverse' : ''}`}><span>{t('checkout_shipping')}</span><span>{order.shipping_fee === 0 ? t('checkout_free') : `${order.shipping_fee} ${currency}`}</span></div>
-                      {order.discount_amount > 0 && <div className={`flex justify-between text-green-600 ${isRTL ? 'flex-row-reverse' : ''}`}><span>{t('checkout_discount')}</span><span>-{order.discount_amount.toFixed(2)} {currency}</span></div>}
-                      <div className={`flex justify-between font-bold text-sm text-foreground border-t border-beige-200 pt-2 mt-2 ${isRTL ? 'flex-row-reverse' : ''}`}><span>{t('checkout_total')}</span><span>{order.total.toFixed(2)} {currency}</span></div>
+                      <div className={`flex justify-between text-muted-foreground ${isRTL ? 'flex-row-reverse' : ''}`}><span>{t('checkout_subtotal')}</span><span>{(Number(order.subtotal) || 0).toFixed(2)} {currency}</span></div>
+                      <div className={`flex justify-between text-muted-foreground ${isRTL ? 'flex-row-reverse' : ''}`}><span>{t('checkout_shipping')}</span><span>{order.shipping_fee === 0 ? t('checkout_free') : `${(Number(order.shipping_fee) || 0).toFixed(2)} ${currency}`}</span></div>
+                      {order.discount_amount > 0 && <div className={`flex justify-between text-green-600 ${isRTL ? 'flex-row-reverse' : ''}`}><span>{t('checkout_discount')}</span><span>-{(Number(order.discount_amount) || 0).toFixed(2)} {currency}</span></div>}
+                      <div className={`flex justify-between font-bold text-sm text-foreground border-t border-beige-200 pt-2 mt-2 ${isRTL ? 'flex-row-reverse' : ''}`}><span>{t('checkout_total')}</span><span>{(Number(order.total) || 0).toFixed(2)} {currency}</span></div>
                     </div>
                   </div>
                 )}

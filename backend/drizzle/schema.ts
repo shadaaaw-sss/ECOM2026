@@ -11,6 +11,15 @@ export const brand = pgTable('brand', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+export const product_image = pgTable('product_image', {
+  id: varchar('id', { length: 36 }).primaryKey(),
+  productId: varchar('product_id', { length: 36 }).notNull(),
+  url: text('url').notNull(),
+  altText: text('alt_text'),
+  sortOrder: integer('sort_order').default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
 export const shipping_method = pgTable('shipping_method', {
   id: varchar('id', { length: 36 }).primaryKey(),
   name: text('name').notNull(),
@@ -24,10 +33,23 @@ export const product = pgTable('product', {
   id: varchar('id', { length: 36 }).primaryKey(),
   name: text('name').notNull(),
   description: text('description'),
+  shortDescription: text('short_description'),
+  slug: text('slug'),
   price: numeric('price', { precision: 10, scale: 2 }).default('0'),
+  originalPrice: numeric('original_price', { precision: 10, scale: 2 }),
+  discountPercent: integer('discount_percent').default(0),
+  stock: integer('stock').default(0),
+  weight: numeric('weight', { precision: 10, scale: 2 }),
+  dimensions: text('dimensions'),
+  tags: text('tags'),
+  thumbnailUrl: text('thumbnail_url'),
   brandId: varchar('brand_id', { length: 36 }),
   categoryId: varchar('category_id', { length: 36 }),
+  isFeatured: boolean('is_featured').default(false),
+  isNew: boolean('is_new').default(false),
   isActive: boolean('is_active').default(true),
+  metaTitle: text('meta_title'),
+  metaDescription: text('meta_description'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
@@ -51,11 +73,11 @@ export const order = pgTable('order', {
   lastName: text('last_name').notNull(),
   email: text('email').notNull(),
   phone: text('phone'),
-  addressLine1: text('address_line1').notNull(),
+  addressLine1: text('address_line1'),
   addressLine2: text('address_line2'),
-  city: text('city').notNull(),
+  city: text('city'),
   postalCode: text('postal_code'),
-  country: text('country').notNull(),
+  country: text('country').default('Qatar'),
   notes: text('notes'),
   shippingMethod: text('shipping_method'),
   paymentMethod: text('payment_method'),
@@ -65,6 +87,8 @@ export const order = pgTable('order', {
   discountAmount: numeric('discount_amount', { precision: 12, scale: 2 }).default('0'),
   total: numeric('total', { precision: 12, scale: 2 }).default('0'),
   couponCode: text('coupon_code'),
+  isFacture: boolean('is_facture').default(false),
+  factureNumber: text('facture_number'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
@@ -91,6 +115,10 @@ export const coupon = pgTable('coupon', {
   id: varchar('id', { length: 36 }).primaryKey(),
   code: varchar('code', { length: 50 }).notNull(),
   discountPercent: integer('discount_percent').default(0),
+  minAmount: numeric('min_amount', { precision: 10, scale: 2 }),
+  maxUses: integer('max_uses').default(0),
+  usedCount: integer('used_count').default(0),
+  isActive: boolean('is_active').default(true),
   startsAt: timestamp('starts_at'),
   endsAt: timestamp('ends_at'),
   createdAt: timestamp('created_at').defaultNow(),

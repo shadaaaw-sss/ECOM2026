@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
+import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../db.js';
 import { authMiddleware, requireAdmin } from '../middleware/auth.js';
 export const ordersRoutes = Router();
@@ -30,7 +31,7 @@ ordersRoutes.post('/', async (req, res) => {
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
-            const orderId = require('uuid').v4();
+            const orderId = uuidv4();
             await client.query(`INSERT INTO "order"(id,user_id,order_number,first_name,last_name,email,phone,address_line1,address_line2,city,postal_code,country,notes,shipping_method,payment_method,subtotal,shipping_fee,tax_amount,discount_amount,total,coupon_code,created_at)
          VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,NOW())`, [
                 orderId,
@@ -56,7 +57,7 @@ ordersRoutes.post('/', async (req, res) => {
                 orderData.couponCode || null,
             ]);
             const itemInserts = (items || []).map((item) => {
-                const itemId = require('uuid').v4();
+                const itemId = uuidv4();
                 const subtotal = Number(item.product.price) * Number(item.quantity);
                 return client.query(`INSERT INTO order_item(id,order_id,product_id,product_name,product_thumbnail,brand_name,price,quantity,subtotal,created_at)
            VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())`, [
@@ -71,11 +72,15 @@ ordersRoutes.post('/', async (req, res) => {
                     subtotal,
                 ]);
             });
+            // Update stock for each product
+            for (const item of items || []) {
+                await client.query('UPDATE product SET stock = stock - $1 WHERE id = $2', [Number(item.quantity), item.product.id]);
+            }
             await Promise.all(itemInserts);
             await client.query('COMMIT');
             // return created order with items
-            const { rows: orderRows } = await pool.query('SELECT * FROM "order" WHERE id = $1', [orderId]);
-            const { rows: orderItems } = await pool.query('SELECT * FROM order_item WHERE order_id = $1', [orderId]);
+            const { rows: orderRows } = await pool.query('SELECT id, user_id, order_number, status, first_name, last_name, email, phone, address_line1, address_line2, city, postal_code, country, notes, shipping_method, payment_method, CAST(subtotal AS NUMERIC(12,2)) AS subtotal, CAST(shipping_fee AS NUMERIC(12,2)) AS shipping_fee, CAST(tax_amount AS NUMERIC(12,2)) AS tax_amount, CAST(discount_amount AS NUMERIC(12,2)) AS discount_amount, CAST(total AS NUMERIC(12,2)) AS total, coupon_code, created_at FROM "order" WHERE id = $1', [orderId]);
+            const { rows: orderItems } = await pool.query('SELECT id, order_id, product_id, product_name, product_thumbnail, brand_name, CAST(price AS NUMERIC(12,2)) AS price, CAST(quantity AS INTEGER) AS quantity, CAST(subtotal AS NUMERIC(12,2)) AS subtotal, created_at FROM order_item WHERE order_id = $1', [orderId]);
             res.status(201).json({ ...orderRows[0], items: orderItems });
         }
         catch (txErr) {
@@ -94,7 +99,7 @@ ordersRoutes.post('/', async (req, res) => {
 ordersRoutes.get('/', authMiddleware, async (req, res) => {
     try {
         const showAll = req.query.all === 'true';
-        let ordersQuery = 'SELECT * FROM "order"';
+        let ordersQuery = 'SELECT id, user_id, order_number, status, first_name, last_name, email, phone, address_line1, address_line2, city, postal_code, country, notes, shipping_method, payment_method, CAST(subtotal AS NUMERIC(12,2)) AS subtotal, CAST(shipping_fee AS NUMERIC(12,2)) AS shipping_fee, CAST(tax_amount AS NUMERIC(12,2)) AS tax_amount, CAST(discount_amount AS NUMERIC(12,2)) AS discount_amount, CAST(total AS NUMERIC(12,2)) AS total, coupon_code, created_at FROM "order"';
         const params = [];
         if (!showAll || !(req.userRole === 'ADMIN' || req.userRole === 'SUPERADMIN')) {
             ordersQuery += ' WHERE user_id = $1';
@@ -106,7 +111,7 @@ ordersRoutes.get('/', authMiddleware, async (req, res) => {
         const orderIds = orders.map((o) => o.id);
         let items = [];
         if (orderIds.length) {
-            const { rows } = await pool.query('SELECT * FROM order_item WHERE order_id = ANY($1)', [orderIds]);
+            const { rows } = await pool.query('SELECT id, order_id, product_id, product_name, product_thumbnail, brand_name, CAST(price AS NUMERIC(12,2)) AS price, CAST(quantity AS INTEGER) AS quantity, CAST(subtotal AS NUMERIC(12,2)) AS subtotal, created_at FROM order_item WHERE order_id = ANY($1)', [orderIds]);
             items = rows;
         }
         const withItems = orders.map((o) => ({ ...o, items: items.filter(i => i.order_id === o.id) }));

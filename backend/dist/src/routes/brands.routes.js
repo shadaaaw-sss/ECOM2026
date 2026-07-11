@@ -1,24 +1,15 @@
 import { Router } from 'express';
-import { pool, db } from '../db.js';
+import { v4 as uuidv4 } from 'uuid';
+import { pool } from '../db.js';
 import { authMiddleware, requireAdmin, getUserRoleFromHeader } from '../middleware/auth.js';
-import { brand, product } from '../../drizzle/schema.js';
-import { asc, eq } from 'drizzle-orm/expressions.js';
 export const brandsRoutes = Router();
 brandsRoutes.get('/', async (req, res) => {
     const all = req.query.all === 'true';
     const userRole = getUserRoleFromHeader(req);
     const showAll = all && (userRole === 'ADMIN' || userRole === 'SUPERADMIN');
     try {
-        if (db && db.select) {
-            let q = db.select().from(brand);
-            q = q.orderBy(asc(brand.sortOrder));
-            if (!showAll)
-                q = q.where(eq(brand.isActive, true));
-            const rows = await q;
-            return res.json(rows);
-        }
         const whereClause = showAll ? '' : 'WHERE is_active = true';
-        const { rows } = await pool.query(`SELECT * FROM brand ${whereClause} ORDER BY sort_order ASC`);
+        const { rows } = await pool.query(`SELECT id, name, description, logo_url, CAST(sort_order AS INTEGER) AS sort_order, is_featured, is_active, created_at FROM brand ${whereClause} ORDER BY sort_order ASC`);
         res.json(rows);
     }
     catch (error) {
@@ -27,19 +18,6 @@ brandsRoutes.get('/', async (req, res) => {
 });
 brandsRoutes.get('/:id', async (req, res) => {
     try {
-        if (db && db.select) {
-            const brands = await db.select().from(brand).where(eq(brand.id, String(req.params.id)));
-            const brandRow = brands[0];
-            if (!brandRow)
-                return res.status(404).json({ message: 'Brand not found' });
-            const products = await db
-                .select()
-                .from(product)
-                .where(eq(product.brandId, brandRow.id))
-                .where(eq(product.isActive, true))
-                .limit(12);
-            return res.json({ brand: brandRow, products });
-        }
         const { rows: brands } = await pool.query('SELECT * FROM brand WHERE id = $1', [String(req.params.id)]);
         const brandRow = brands[0];
         if (!brandRow)
@@ -56,7 +34,7 @@ brandsRoutes.post('/', authMiddleware, requireAdmin, async (req, res) => {
     if (!name)
         return res.status(400).json({ message: 'Name is required' });
     try {
-        const id = require('uuid').v4();
+        const id = uuidv4();
         const insert = `INSERT INTO brand(id, name, description, logo_url, sort_order, is_featured, is_active, created_at) VALUES($1,$2,$3,$4,$5,$6,$7,NOW()) RETURNING *`;
         const { rows } = await pool.query(insert, [id, name, description || null, logoUrl || null, sortOrder !== undefined ? Number(sortOrder) : 0, Boolean(isFeatured), isActive !== undefined ? Boolean(isActive) : true]);
         res.status(201).json(rows[0]);

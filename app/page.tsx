@@ -142,11 +142,10 @@ export default function HomePage() {
       {/* ============ TRUST BAR ============ */}
       <section className="bg-white border-y border-beige-100">
         <div className="max-w-7xl mx-auto px-4 py-5">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {[
               { icon: Truck, title: t('trust_free_delivery'), desc: t('trust_free_delivery_desc') },
               { icon: CreditCard, title: t('trust_secure_payment'), desc: t('trust_secure_payment_desc') },
-              { icon: RefreshCw, title: t('trust_easy_returns'), desc: t('trust_easy_returns_desc') },
               { icon: Headphones, title: t('trust_support'), desc: t('trust_support_desc') },
             ].map(({ icon: Icon, title, desc }) => (
               <div key={title} className="flex items-center gap-3 py-2">

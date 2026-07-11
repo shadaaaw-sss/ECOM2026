@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../db.js';
 import { authMiddleware, requireAdmin } from '../middleware/auth.js';
 export const newslettersRoutes = Router();
@@ -7,7 +8,7 @@ newslettersRoutes.post('/', async (req, res) => {
     if (!email)
         return res.status(400).json({ message: 'Email is required' });
     try {
-        const id = require('uuid').v4();
+        const id = uuidv4();
         await pool.query('INSERT INTO newsletter_subscriber(id,email) VALUES($1,$2) ON CONFLICT (email) DO NOTHING', [id, email]);
         res.status(201).json({ ok: true });
     }
