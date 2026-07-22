@@ -112,7 +112,7 @@ function getDatabaseConfig(): DatabaseConfig {
 
 function getCorsConfig(): CorsConfig {
   const envOrigins = process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()).filter(Boolean)
+    ? process.env.CORS_ORIGIN.split(',').map(o => o.trim().replace(/\/+$/, '')).filter(Boolean)
     : [];
 
   const defaultOrigins = [
