@@ -22,6 +22,7 @@ import { errorHandler } from './middleware/error-handler.js';
 import { rateLimiter } from './middleware/rate-limiter.js';
 import initDatabase from './init-db.js';
 
+//App
 const app = express();
 
 // Middleware
