@@ -1,0 +1,85 @@
+{
+  "name": "makhmal-admin-desktop",
+  "version": "1.0.0",
+  "description": "Makhmal E-Commerce Admin Desktop Dashboard",
+  "main": "main.js",
+  "homepage": "./",
+  "scripts": {
+    "start": "electron .",
+    "dev": "concurrently \"cross-env PORT=3001 npm run dev:react\" \"wait-on http://localhost:3001 && cross-env NODE_ENV=development electron .\"",
+    "dev:react": "react-scripts start",
+    "build": "npm run build:react && electron-builder",
+    "build:react": "react-scripts build",
+    "build:win": "npm run build:react && electron-builder --win",
+    "dist": "npm run build:react && electron-builder --publish=never",
+    "lint": "eslint src --ext .js,.jsx",
+    "typecheck": "tsc --noEmit"
+  },
+  "author": "Makhmal",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.2",
+    "lucide-react": "^0.294.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-scripts": "5.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "concurrently": "^8.2.2",
+    "cross-env": "^10.1.0",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1",
+    "typescript": "^5.3.0",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.makhmal.admin",
+    "productName": "Makhmal Admin Dashboard",
+    "extraMetadata": {
+      "main": "main.js"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "icon/logo.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/logo.icns"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "icon/logo.png"
+    },
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "build/**/*",
+      "main.js",
+      "preload.js",
+      "icon/**/*"
+    ],
+    "extraResources": []
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}
