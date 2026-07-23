@@ -40,7 +40,7 @@ brandsRoutes.get('/:id', validateParams(idParamSchema), async (req, res) => {
 });
 
 brandsRoutes.post('/', authMiddleware, requireAdmin, validateBody(brandSchema), async (req, res) => {
-  const { name, description, logoUrl, sortOrder, isFeatured, isActive } = req.body;
+  const { name, description, logoUrl, sortOrder, isFeatured, isActive, bannerMedia } = req.body;
   try {
     const id = uuidv4();
     const slug = String(name)
@@ -48,7 +48,7 @@ brandsRoutes.post('/', authMiddleware, requireAdmin, validateBody(brandSchema), 
       .trim()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)/g, '') || `brand-${id.slice(0, 8)}`;
-    const insert = `INSERT INTO brand(id, name, slug, description, logo_url, sort_order, is_featured, is_active, created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,NOW()) RETURNING *`;
+    const insert = `INSERT INTO brand(id, name, slug, description, logo_url, sort_order, is_featured, is_active, banner_media, created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW()) RETURNING *`;
     const { rows } = await pool.query(insert, [
       id,
       name,
@@ -58,6 +58,7 @@ brandsRoutes.post('/', authMiddleware, requireAdmin, validateBody(brandSchema), 
       sortOrder !== undefined ? Number(sortOrder) : 0,
       Boolean(isFeatured),
       isActive !== undefined ? Boolean(isActive) : true,
+      JSON.stringify(bannerMedia || []),
     ]);
     res.status(201).json(rows[0]);
   } catch (error: any) {
@@ -66,7 +67,7 @@ brandsRoutes.post('/', authMiddleware, requireAdmin, validateBody(brandSchema), 
 });
 
 brandsRoutes.patch('/:id', authMiddleware, requireAdmin, validateParams(idParamSchema), validateBody(brandSchema.partial()), async (req, res) => {
-  const { name, description, logoUrl, sortOrder, isFeatured, isActive } = req.body;
+  const { name, description, logoUrl, sortOrder, isFeatured, isActive, bannerMedia } = req.body;
   try {
     const fields: string[] = [];
     const values: any[] = [];
@@ -77,6 +78,7 @@ brandsRoutes.patch('/:id', authMiddleware, requireAdmin, validateParams(idParamS
     if (sortOrder !== undefined) { fields.push(`sort_order = $${idx++}`); values.push(Number(sortOrder)); }
     if (isFeatured !== undefined) { fields.push(`is_featured = $${idx++}`); values.push(Boolean(isFeatured)); }
     if (isActive !== undefined) { fields.push(`is_active = $${idx++}`); values.push(Boolean(isActive)); }
+    if (bannerMedia !== undefined) { fields.push(`banner_media = $${idx++}`); values.push(JSON.stringify(bannerMedia)); }
     if (fields.length === 0) return res.status(400).json({ message: 'No fields to update' });
     const sql = `UPDATE brand SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`;
     values.push(String(req.params.id));

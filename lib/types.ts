@@ -1,3 +1,9 @@
+export interface BrandBannerMedia {
+  url: string;
+  type: 'image' | 'video';
+  position: number;
+}
+
 export interface Brand {
   id: string;
   name: string;
@@ -10,6 +16,8 @@ export interface Brand {
   isActive?: boolean;
   sort_order?: number;
   sortOrder?: number;
+  banner_media?: BrandBannerMedia[];
+  bannerMedia?: BrandBannerMedia[];
   created_at?: string;
   createdAt?: string;
 }

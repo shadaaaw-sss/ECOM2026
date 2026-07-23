@@ -47,6 +47,19 @@ const initDatabase = async () => {
       }
     }
 
+    // Idempotent migration for brand: ensure the banner_media column exists
+    // even on already-provisioned databases where the early return below
+    // would skip the CREATE TABLE block.
+    if (existingTables.includes('brand')) {
+      try {
+        await pool.query(`ALTER TABLE brand ADD COLUMN IF NOT EXISTS banner_media JSONB DEFAULT '[]'::jsonb;`);
+        console.log('✅ Brand table migrated (banner_media column)');
+      } catch (migrationError: any) {
+        console.error('❌ Brand table migration failed:', migrationError.message);
+        throw migrationError;
+      }
+    }
+
     // Idempotent migration for product_image: ensure the table and its
     // multi-media columns (type, is_main) exist even on already-provisioned
     // databases where the early return below would skip the CREATE TABLE block.
@@ -106,6 +119,7 @@ const initDatabase = async () => {
         is_featured BOOLEAN DEFAULT false,
         is_active BOOLEAN DEFAULT true,
         sort_order INTEGER DEFAULT 0,
+        banner_media JSONB DEFAULT '[]'::jsonb,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 

@@ -1,10 +1,42 @@
 import { Router } from 'express';
 import multer from 'multer';
+import { pool } from '../db.js';
 import { authMiddleware, requireAdmin, AuthRequest } from '../middleware/auth.js';
 import { getMediaService, UploadOptions } from '../services/media.service.js';
 
 const upload = multer({ storage: multer.memoryStorage() });
 export const uploadsRoutes = Router();
+
+// GET /api/uploads/library - List already-uploaded media across the site so
+// admins can reuse an existing file instead of re-uploading (saves cloud storage).
+uploadsRoutes.get('/library', authMiddleware, requireAdmin, async (_req, res) => {
+  try {
+    const { rows: tables } = await pool.query(
+      `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('product_image', 'homepage_hero')`
+    );
+    const existing = tables.map((r: any) => r.table_name);
+
+    const sources: string[] = [`SELECT url, type FROM product_image`];
+    if (existing.includes('homepage_hero')) {
+      sources.push(`SELECT url, type FROM homepage_hero`);
+    }
+    sources.push(`
+      SELECT (item->>'url') AS url, COALESCE(item->>'type', 'image') AS type
+      FROM brand, jsonb_array_elements(COALESCE(banner_media, '[]'::jsonb)) AS item
+    `);
+
+    const { rows } = await pool.query(`
+      SELECT DISTINCT url, type FROM (${sources.join(' UNION ALL ')}) combined
+      WHERE url IS NOT NULL AND url <> ''
+      ORDER BY url DESC
+      LIMIT 300
+    `);
+    res.json(rows);
+  } catch (error: any) {
+    console.error('Media library error:', error);
+    res.status(500).json({ message: error.message || 'Failed to fetch media library' });
+  }
+});
 
 // POST /api/uploads - Upload a single file (requires admin auth)
 uploadsRoutes.post('/', authMiddleware, requireAdmin, upload.single('file'), async (req: AuthRequest, res) => {

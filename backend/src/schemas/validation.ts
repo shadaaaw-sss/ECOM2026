@@ -78,6 +78,11 @@ export const brandSchema = z.object({
   sortOrder: z.number().int().default(0).optional(),
   isFeatured: z.boolean().default(false).optional(),
   isActive: z.boolean().default(true).optional(),
+  bannerMedia: z.array(z.object({
+    url: z.string().url(),
+    type: z.enum(['image', 'video']).default('image'),
+    position: z.number().int().default(0),
+  })).optional(),
 });
 
 export const orderStatusSchema = z.object({

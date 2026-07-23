@@ -18,6 +18,17 @@ export default function BrandDetailPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [filter, setFilter] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [bannerIndex, setBannerIndex] = useState(0);
+
+  const bannerMedia = (brand?.bannerMedia || brand?.banner_media || [])
+    .slice()
+    .sort((a, b) => a.position - b.position);
+
+  useEffect(() => {
+    if (bannerMedia.length <= 1) return;
+    const timer = setInterval(() => setBannerIndex((i) => (i + 1) % bannerMedia.length), 6000);
+    return () => clearInterval(timer);
+  }, [bannerMedia.length]);
 
   useEffect(() => {
     const fetch = async () => {
@@ -50,9 +61,50 @@ export default function BrandDetailPage() {
 
   if (!brand) return null;
 
+  const logo = brand.logo_url || brand.logoUrl;
+
   return (
-    <div className="min-h-screen bg-cream py-6" dir={isRTL ? 'rtl' : 'ltr'}>
-      <div className="max-w-7xl mx-auto px-4">
+    <div className="min-h-screen bg-cream" dir={isRTL ? 'rtl' : 'ltr'}>
+      {bannerMedia.length > 0 && (
+        <div className="relative w-full h-[35vh]">
+          <div className="absolute inset-0 overflow-hidden bg-black">
+            {bannerMedia.map((item, i) => (
+              <div
+                key={item.url}
+                className={`absolute inset-0 transition-opacity duration-1000 ${i === bannerIndex ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+              >
+                {item.type === 'video' ? (
+                  <video src={item.url} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+                ) : (
+                  <img src={item.url} alt={brand.name} className="w-full h-full object-cover" />
+                )}
+              </div>
+            ))}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent" />
+          </div>
+
+          {bannerMedia.length > 1 && (
+            <div className={`absolute bottom-4 flex gap-1.5 ${isRTL ? 'left-6' : 'right-6'}`}>
+              {bannerMedia.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setBannerIndex(i)}
+                  aria-label={`Slide ${i + 1}`}
+                  className={`h-1.5 rounded-full transition-all ${i === bannerIndex ? 'w-6 bg-white' : 'w-1.5 bg-white/50'}`}
+                />
+              ))}
+            </div>
+          )}
+
+          {logo && (
+            <div className={`absolute -bottom-8 z-10 w-20 h-20 rounded-full bg-white shadow-xl border border-beige-100 flex items-center justify-center overflow-hidden ${isRTL ? 'right-6 md:right-12' : 'left-6 md:left-12'}`}>
+              <img src={logo} alt={brand.name} className="w-14 h-14 object-contain" />
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className={`max-w-7xl mx-auto px-4 py-6 ${bannerMedia.length > 0 ? 'pt-12' : ''}`}>
         {/* Breadcrumb */}
         <nav className={`flex items-center gap-2 text-sm font-sans text-muted-foreground mb-6 ${isRTL ? 'flex-row-reverse' : ''}`}>
           <Link href="/brands" className="hover:text-foreground">{t('nav_brands')}</Link>

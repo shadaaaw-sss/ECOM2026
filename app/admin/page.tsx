@@ -14,6 +14,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { Product, Category, Brand, Order } from '@/lib/types';
 import MediaManager, { MediaItem } from '@/components/MediaManager';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 type AdminTab = 'dashboard' | 'products' | 'categories' | 'brands' | 'orders' | 'factures' | 'shipping' | 'hero';
 
@@ -132,6 +133,7 @@ export default function AdminPage() {
     sortOrder: '0',
     isFeatured: false,
     isActive: true,
+    bannerMedia: [] as MediaItem[],
   });
 
   const resetProductForm = () => {
@@ -233,7 +235,7 @@ export default function AdminPage() {
 
   const resetBrandForm = () => {
     setBrandFormMode('create');
-    setBrandFormData({ id: '', name: '', description: '', logoUrl: '', sortOrder: '0', isFeatured: false, isActive: true });
+    setBrandFormData({ id: '', name: '', description: '', logoUrl: '', sortOrder: '0', isFeatured: false, isActive: true, bannerMedia: [] });
   };
 
   const openBrandForm = (brand?: Brand) => {
@@ -245,6 +247,7 @@ export default function AdminPage() {
     }
 
     setBrandFormMode('edit');
+    const bannerSource = brand.bannerMedia || brand.banner_media || [];
     setBrandFormData({
       id: brand.id,
       name: brand.name,
@@ -253,6 +256,10 @@ export default function AdminPage() {
       sortOrder: String(brand.sortOrder ?? brand.sort_order ?? 0),
       isFeatured: Boolean(brand.isFeatured || brand.is_featured),
       isActive: Boolean(brand.isActive || brand.is_active),
+      bannerMedia: bannerSource
+        .slice()
+        .sort((a, b) => a.position - b.position)
+        .map((item, i) => ({ url: item.url, type: item.type, isMain: false, sortOrder: i })),
     });
     setBrandFormOpen(true);
   };
@@ -352,6 +359,7 @@ export default function AdminPage() {
       sortOrder: Number(brandFormData.sortOrder),
       isFeatured: brandFormData.isFeatured,
       isActive: brandFormData.isActive,
+      bannerMedia: brandFormData.bannerMedia.map((item, i) => ({ url: item.url, type: item.type, position: i })),
     };
 
     try {
@@ -939,20 +947,15 @@ export default function AdminPage() {
                 </button>
               </div>
 
-              {/* Add/Edit Product Drawer Modal */}
-              {productFormOpen && (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-lg p-6 animate-in slide-in-from-top-6 duration-300">
-                  <div className={`flex items-center justify-between mb-6 pb-4 border-b border-gray-50 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                    <div className={isRTL ? 'text-right' : ''}>
-                      <h2 className="font-serif text-xl font-bold text-foreground">
-                        {productFormMode === 'create' ? t('admin_create_product') : t('admin_edit_product')}
-                      </h2>
-                      <p className="text-xs text-muted-foreground mt-0.5">Publish brand new items to store catalog.</p>
-                    </div>
-                    <button onClick={() => setProductFormOpen(false)} className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-muted-foreground transition">
-                      <X size={16} />
-                    </button>
-                  </div>
+              {/* Add/Edit Product Modal */}
+              <Dialog open={productFormOpen} onOpenChange={setProductFormOpen}>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle className="font-serif text-xl">
+                      {productFormMode === 'create' ? t('admin_create_product') : t('admin_edit_product')}
+                    </DialogTitle>
+                    <p className="text-xs text-muted-foreground mt-0.5">Publish brand new items to store catalog.</p>
+                  </DialogHeader>
 
                   <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
                     {/* Left Form Column */}
@@ -1185,8 +1188,8 @@ export default function AdminPage() {
                     <button onClick={() => setProductFormOpen(false)} className="rounded-full border border-gray-200 bg-white px-5 py-2.5 text-xs font-sans font-bold text-slate-700 hover:bg-gray-50 transition">{t('admin_cancel')}</button>
                     <button onClick={saveProduct} className="rounded-full bg-burgundy-700 hover:bg-burgundy-800 text-xs font-sans font-bold text-white px-5 py-2.5 transition shadow-md">{productFormMode === 'create' ? t('admin_create_product') : t('admin_save_changes')}</button>
                   </div>
-                </div>
-              )}
+                </DialogContent>
+              </Dialog>
 
               {/* Products Table list */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -1518,14 +1521,11 @@ export default function AdminPage() {
               </div>
 
               {/* Brand Form */}
-              {brandFormOpen && (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-lg p-6 animate-in slide-in-from-top-6 duration-300">
-                  <div className={`flex items-center justify-between mb-5 pb-3 border-b border-gray-50 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                    <h2 className="font-serif text-lg font-bold text-foreground">{brandFormMode === 'create' ? t('admin_create_brand') : t('admin_edit_brand')}</h2>
-                    <button onClick={() => setBrandFormOpen(false)} className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-muted-foreground transition">
-                      <X size={16} />
-                    </button>
-                  </div>
+              <Dialog open={brandFormOpen} onOpenChange={setBrandFormOpen}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle className="font-serif">{brandFormMode === 'create' ? t('admin_create_brand') : t('admin_edit_brand')}</DialogTitle>
+                  </DialogHeader>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="grid gap-1.5">
                       <label className="text-xs font-semibold text-slate-700">{t('admin_name')}</label>
@@ -1561,13 +1561,22 @@ export default function AdminPage() {
                         </label>
                       </div>
                     </div>
+                    <div className="grid gap-1.5 md:col-span-2">
+                      <label className="text-xs font-semibold text-slate-700">Banner media (brand page carousel)</label>
+                      <MediaManager
+                        media={brandFormData.bannerMedia}
+                        onChange={(items) => setBrandFormData(prev => ({ ...prev, bannerMedia: items }))}
+                        folder="brands"
+                        showMainToggle={false}
+                      />
+                    </div>
                   </div>
                   <div className="mt-6 pt-3 border-t border-gray-50 flex flex-wrap items-center gap-3 justify-end">
                     <button onClick={() => setBrandFormOpen(false)} className="rounded-full border border-gray-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-gray-50 transition">{t('admin_cancel')}</button>
                     <button onClick={saveBrand} className="rounded-full bg-burgundy-700 hover:bg-burgundy-800 text-xs font-bold text-white px-4 py-2 transition">{brandFormMode === 'create' ? t('admin_create_brand') : t('admin_save_changes')}</button>
                   </div>
-                </div>
-              )}
+                </DialogContent>
+              </Dialog>
 
               {/* Brands visual layout Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
