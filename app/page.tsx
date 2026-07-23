@@ -147,13 +147,13 @@ export default function HomePage() {
               <Link
                 key={brand.id}
                 href={`/brands/${brand.id}`}
-                className="group flex items-center justify-center aspect-[4/3] rounded-lg border border-beige-100 hover:border-beige-200 bg-white transition-all duration-500"
+                className="group flex items-center justify-center aspect-[4/3] rounded-lg border border-beige-100 hover:border-beige-200 bg-white transition-all duration-500 hover:shadow-md hover:-translate-y-0.5"
               >
                 {brand.logoUrl || brand.logo_url ? (
                   <img
                     src={brand.logoUrl || brand.logo_url || ''}
                     alt={brand.name}
-                    className="w-3/5 h-3/5 object-contain transition-all duration-500 grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100"
+                    className="w-3/5 h-3/5 object-contain transition-transform duration-500 group-hover:scale-110"
                   />
                 ) : (
                   <span className="font-serif text-4xl text-beige-300 group-hover:text-burgundy-700/30 transition-colors duration-500">

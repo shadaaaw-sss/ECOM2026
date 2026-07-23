@@ -33,16 +33,16 @@ export default function BrandsPage() {
               <Link
                 key={brand.id}
                 href={`/brands/${brand.id}`}
-                className="group flex items-center justify-center w-full aspect-square"
+                className="group flex items-center justify-center w-full aspect-square rounded-full transition-all duration-300 ease-out hover:shadow-md hover:-translate-y-0.5"
               >
                 {brand.logo_url || brand.logoUrl ? (
                   <img
                     src={brand.logo_url || brand.logoUrl || ''}
                     alt={brand.name}
-                    className="w-3/5 h-3/5 object-contain grayscale opacity-60 transition-all duration-300 ease-out group-hover:grayscale-0 group-hover:opacity-100 group-hover:scale-105"
+                    className="w-3/5 h-3/5 object-contain transition-transform duration-300 ease-out group-hover:scale-110"
                   />
                 ) : (
-                  <span className="font-serif text-4xl text-beige-300 grayscale opacity-60 transition-all duration-300 ease-out group-hover:grayscale-0 group-hover:opacity-100 group-hover:scale-105 group-hover:text-burgundy-700">
+                  <span className="font-serif text-4xl text-beige-300 transition-colors duration-300 ease-out group-hover:text-burgundy-700">
                     {brand.name.slice(0, 1).toUpperCase()}
                   </span>
                 )}
